@@ -1,5 +1,6 @@
 # Opamok
 
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/e1f2a5a0-3d70-4732-8ef2-5105cba45802" />
 
 ---
 Opamok은 오목대결을 할때
