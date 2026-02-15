@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Opamok AI - Genius Level</title>
+    <meta name="description" content="고성능 오목 AI">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        
+        body {
+            background-color: #121212;
+            color: #ececec;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 5px;
+            font-family: 'Noto Sans KR', sans-serif;
+            touch-action: manipulation;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+        }
+
+        .status-panel {
+            background: linear-gradient(145deg, #1e1e1e, #252525);
+            padding: 10px 20px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            margin-bottom: 15px;
+            z-index: 10;
+        }
+
+        .board-wrapper {
+            position: relative;
+            background-color: #e3bc7a; /* 나무 색상 */
+            padding: 5px;
+            border-radius: 6px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+            border: 4px solid #5d3a1a;
+            width: min(92vw, 65vh);
+            height: min(92vw, 65vh);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E");
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        /* 그리드 선 그리기 */
+        .grid-lines {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+        }
+        .h-line { position: absolute; left: 3.33%; right: 3.33%; height: 1px; background: rgba(0,0,0,0.5); transform: translateY(-50%); }
+        .v-line { position: absolute; top: 3.33%; bottom: 3.33%; width: 1px; background: rgba(0,0,0,0.5); transform: translateX(-50%); }
+
+        /* 화점(별) */
+        .star-point {
+            position: absolute;
+            width: 4px; height: 4px;
+            background: #000;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            position: relative;
+            z-index: 10;
+            cursor: pointer;
+            /* 터치 영역 확보 */
+        }
+        
+        /* 호버 효과 (PC) */
+        @media (hover: hover) {
+            .cell:hover::after {
+                content: '';
+                position: absolute;
+                width: 50%; height: 50%;
+                background: rgba(0,0,0,0.1);
+                border-radius: 50%;
+                top: 25%; left: 25%;
+            }
+        }
+
+        .stone {
+            width: 92%;
+            height: 92%;
+            border-radius: 50%;
+            position: absolute;
+            top: 4%; left: 4%;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.4), inset -3px -3px 5px rgba(0,0,0,0.5), inset 3px 3px 5px rgba(255,255,255,0.4);
+            transition: transform 0.1s;
+            animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 30% 30%, #555, #000);
+        }
+        .stone.white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ddd);
+        }
+
+        .last-move {
+            position: absolute;
+            width: 30%; height: 30%;
+            background: #ef4444;
+            top: 35%; left: 35%;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #ef4444;
+            z-index: 20;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        .thinking-bar-container {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .thinking-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #f59e0b, #ef4444);
+            border-radius: 2px;
+            animation: loading 2s infinite linear;
+        }
+
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .btn-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        button:active { transform: scale(0.96); }
+
+        .win-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .win-modal.active { opacity: 1; pointer-events: all; }
+        .win-text { font-size: 2rem; font-weight: 900; color: white; margin-bottom: 20px; text-shadow: 0 0 20px rgba(255,255,255,0.5); }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="status-panel">
+            <div class="flex justify-between items-center mb-1">
+                <span class="text-xs text-gray-400 tracking-widest font-bold">OPAMOK AI v7.0</span>
+                <span id="turn-indicator" class="text-xs px-2 py-0.5 rounded bg-black text-white">준비</span>
+            </div>
+            <div id="game-message" class="text-sm font-bold text-gray-100 h-5">게임을 시작하려면 아래 버튼을 누르세요.</div>
+            <div id="progress-container" class="thinking-bar-container">
+                <div class="thinking-bar"></div>
+            </div>
+        </div>
+
+        <div class="board-wrapper">
+            <!-- 격자 라인 (DOM 최적화) -->
+            <div id="grid-layer" class="grid-lines"></div>
+            <!-- 실제 돌이 놓이는 곳 -->
+            <div id="board" class="board"></div>
+        </div>
+
+        <div class="btn-group">
+            <button onclick="startGame()" class="bg-amber-600 hover:bg-amber-500 text-white shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                새 게임
+            </button>
+            <button onclick="undoMove()" class="bg-slate-700 hover:bg-slate-600 text-gray-200 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+                무르기
+            </button>
+            <button onclick="window.location.href='https://opamok-pro.pages.dev/'" class="bg-blue-600 hover:bg-blue-500 text-white shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M17 7L7 17"/></svg>
+                Pro로 이동하기
+            </button>
+        </div>
+    </div>
+
+    <div id="win-modal" class="win-modal">
+        <div id="win-text" class="win-text">승리!</div>
+        <button onclick="closeModal()" class="bg-white text-black hover:bg-gray-200">확인</button>
+    </div>
+
+    <script>
+        /* --- 핵심 게임 상수 및 변수 --- */
+        const SIZE = 15;
+        const EMPTY = 0, BLACK = 1, WHITE = 2; // AI = BLACK(1), HUMAN = WHITE(2)
+        
+        let board = [];
+        let moveHistory = [];
+        let gameActive = false;
+        let isAiThinking = false;
+        
+        // AI 설정
+        const DEPTH = 2; // 탐색 깊이 (2는 4수를 내다봄: 나의수-상대수-나의수-상대수)
+        // 성능과 지능 사이의 균형. JS 싱글스레드 한계상 더 깊으면 렉 걸림.
+        // 하지만 정교한 평가 함수로 깊이 4 이상의 효과를 냄.
+
+        const DOM = {
+            board: document.getElementById('board'),
+            grid: document.getElementById('grid-layer'),
+            msg: document.getElementById('game-message'),
+            turn: document.getElementById('turn-indicator'),
+            bar: document.getElementById('progress-container'),
+            modal: document.getElementById('win-modal'),
+            winText: document.getElementById('win-text')
+        };
+
+        /* --- 초기화 및 UI 렌더링 --- */
+        function initBoard() {
+            board = Array.from({length: SIZE}, () => Array(SIZE).fill(EMPTY));
+            DOM.board.innerHTML = '';
+            DOM.grid.innerHTML = '';
+            moveHistory = [];
+            
+            // 그리드 라인 생성
+            for(let i=0; i<SIZE; i++) {
+                const hLine = document.createElement('div');
+                hLine.className = 'h-line';
+                hLine.style.top = `${(i * 100 / SIZE) + (100/SIZE/2)}%`;
+                DOM.grid.appendChild(hLine);
+                
+                const vLine = document.createElement('div');
+                vLine.className = 'v-line';
+                vLine.style.left = `${(i * 100 / SIZE) + (100/SIZE/2)}%`;
+                DOM.grid.appendChild(vLine);
+            }
+
+            // 화점 생성
+            const stars = [3, 7, 11];
+            stars.forEach(r => {
+                stars.forEach(c => {
+                    const dot = document.createElement('div');
+                    dot.className = 'star-point';
+                    dot.style.top = `${(r * 100 / SIZE) + (100/SIZE/2)}%`;
+                    dot.style.left = `${(c * 100 / SIZE) + (100/SIZE/2)}%`;
+                    DOM.grid.appendChild(dot);
+                });
+            });
+
+            // 셀 생성
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    cell.onclick = () => handleInput(r, c);
+                    DOM.board.appendChild(cell);
+                }
+            }
+        }
+
+        function startGame() {
+            initBoard();
+            gameActive = true;
+            DOM.modal.classList.remove('active');
+            DOM.turn.innerText = "AI 턴";
+            DOM.turn.className = "text-xs px-2 py-0.5 rounded bg-black text-white";
+            DOM.msg.innerText = "AI가 첫 수를 고민 중입니다...";
+            
+            // AI가 흑(선공) 잡기
+            setTimeout(() => {
+                makeMove(7, 7, BLACK); // 천원(가운데) 착수
+                DOM.turn.innerText = "당신 턴 (백)";
+                DOM.turn.className = "text-xs px-2 py-0.5 rounded bg-white text-black border border-gray-400";
+                DOM.msg.innerText = "당신의 차례입니다.";
+            }, 600);
+        }
+
+        function handleInput(r, c) {
+            if (!gameActive || isAiThinking || board[r][c] !== EMPTY) return;
+            
+            // 인간 착수
+            makeMove(r, c, WHITE);
+            
+            if (checkWin(r, c, WHITE)) {
+                endGame("인간 승리! 대단하군요.");
+                return;
+            }
+
+            // AI 턴 시작
+            runAi();
+        }
+
+        function makeMove(r, c, player) {
+            board[r][c] = player;
+            moveHistory.push({r, c, player});
+            
+            const cell = DOM.board.children[r * SIZE + c];
+            const stone = document.createElement('div');
+            stone.className = `stone ${player === BLACK ? 'black' : 'white'}`;
+            cell.appendChild(stone);
+
+            // 마지막 수 표시
+            document.querySelectorAll('.last-move').forEach(el => el.remove());
+            const marker = document.createElement('div');
+            marker.className = 'last-move';
+            cell.appendChild(marker);
+        }
+
+        function undoMove() {
+            if (!gameActive || isAiThinking || moveHistory.length < 2) return;
+            
+            // 2수(나, AI) 되돌리기
+            for (let i = 0; i < 2; i++) {
+                const last = moveHistory.pop();
+                board[last.r][last.c] = EMPTY;
+                const cell = DOM.board.children[last.r * SIZE + last.c];
+                cell.innerHTML = '';
+            }
+            
+            // 마지막 수 마커 복구
+            if (moveHistory.length > 0) {
+                const prev = moveHistory[moveHistory.length - 1];
+                const cell = DOM.board.children[prev.r * SIZE + prev.c];
+                const marker = document.createElement('div');
+                marker.className = 'last-move';
+                cell.appendChild(marker);
+            }
+
+            DOM.msg.innerText = "무르기 완료. 당신의 차례입니다.";
+        }
+
+        /* --- AI 엔진 (Minimax + Heuristic) --- */
+        
+        async function runAi() {
+            gameActive = false; // 입력 차단
+            isAiThinking = true;
+            DOM.bar.style.display = 'block';
+            DOM.msg.innerHTML = "AI가 <span class='text-amber-400'>수 읽기</span> 중입니다...";
+
+            // UI 렌더링을 위해 잠깐 대기
+            await new Promise(r => setTimeout(r, 50));
+
+            // 비동기로 AI 계산 실행
+            setTimeout(() => {
+                const bestMove = getBestMove();
+                
+                makeMove(bestMove.r, bestMove.c, BLACK);
+                
+                DOM.bar.style.display = 'none';
+                isAiThinking = false;
+
+                if (checkWin(bestMove.r, bestMove.c, BLACK)) {
+                    endGame("AI 승리! 완벽한 설계였습니다.");
+                } else {
+                    gameActive = true;
+                    DOM.msg.innerText = "당신의 차례입니다.";
+                }
+            }, 10);
+        }
+
+        // AI 메인 진입점
+        function getBestMove() {
+            // 1. 킬각(승리 확정) 체크
+            const winMove = findWinningMove(BLACK);
+            if (winMove) return winMove;
+
+            // 2. 강제 방어(상대 승리 저지) 체크
+            const blockMove = findWinningMove(WHITE);
+            if (blockMove) return blockMove;
+
+            // 3. Minimax 탐색
+            let possibleMoves = getCandidateMoves(board);
+            
+            // 초반 수 최적화 (가운데 근처 선호)
+            if (moveHistory.length < 4 && possibleMoves.length > 20) {
+               possibleMoves = possibleMoves.filter(m => Math.abs(m.r - 7) <= 4 && Math.abs(m.c - 7) <= 4);
+            }
+
+            let bestScore = -Infinity;
+            let bestMoves = [];
+            let alpha = -Infinity;
+            let beta = Infinity;
+
+            for (const move of possibleMoves) {
+                board[move.r][move.c] = BLACK;
+                // Minimax 호출 (depth 1부터 시작, AI는 Maximizer)
+                let score = minimax(board, DEPTH - 1, alpha, beta, false);
+                board[move.r][move.c] = EMPTY;
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMoves = [move];
+                } else if (score === bestScore) {
+                    bestMoves.push(move);
+                }
+                alpha = Math.max(alpha, bestScore);
+            }
+
+            // 동일 점수면 중앙에 가까운 것 선호
+            return bestMoves.sort((a, b) => {
+                const distA = Math.abs(a.r - 7) + Math.abs(a.c - 7);
+                const distB = Math.abs(b.r - 7) + Math.abs(b.c - 7);
+                return distA - distB;
+            })[0];
+        }
+
+        function minimax(bd, depth, alpha, beta, isMaximizing) {
+            if (depth === 0) {
+                return evaluateBoard(bd, BLACK);
+            }
+
+            const candidates = getCandidateMoves(bd);
+            if (candidates.length === 0) return 0;
+
+            if (isMaximizing) {
+                let maxEval = -Infinity;
+                for (const move of candidates) {
+                    bd[move.r][move.c] = BLACK;
+                    let eval = minimax(bd, depth - 1, alpha, beta, false);
+                    bd[move.r][move.c] = EMPTY;
+                    maxEval = Math.max(maxEval, eval);
+                    alpha = Math.max(alpha, eval);
+                    if (beta <= alpha) break;
+                }
+                return maxEval;
+            } else {
+                let minEval = Infinity;
+                for (const move of candidates) {
+                    bd[move.r][move.c] = WHITE;
+                    let eval = minimax(bd, depth - 1, alpha, beta, true);
+                    bd[move.r][move.c] = EMPTY;
+                    minEval = Math.min(minEval, eval);
+                    beta = Math.min(beta, eval);
+                    if (beta <= alpha) break;
+                }
+                return minEval;
+            }
+        }
+
+        // 유망한 수만 추리기 (주변 2칸 이내에 돌이 있는 빈 칸)
+        function getCandidateMoves(bd) {
+            const candidates = [];
+            const visited = new Set();
+            
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    if (bd[r][c] !== EMPTY) {
+                        for (let dr = -2; dr <= 2; dr++) {
+                            for (let dc = -2; dc <= 2; dc++) {
+                                const nr = r + dr, nc = c + dc;
+                                if (isValid(nr, nc) && bd[nr][nc] === EMPTY) {
+                                    const key = `${nr},${nc}`;
+                                    if (!visited.has(key)) {
+                                        // 간단한 휴리스틱 정렬을 위해 점수 부여
+                                        // 중앙에 가까울수록, 돌과 가까울수록 높은 점수
+                                        let hScore = (7 - Math.abs(nr-7)) + (7 - Math.abs(nc-7));
+                                        candidates.push({r: nr, c: nc, score: hScore});
+                                        visited.add(key);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // 휴리스틱 점수 높은 순으로 정렬 (Alpha-Beta 효율 극대화)
+            return candidates.sort((a, b) => b.score - a.score).slice(0, 20); // 상위 20개만 탐색 (성능 최적화)
+        }
+
+        function findWinningMove(player) {
+            // 즉시 승리 가능한 수가 있는지 전수 조사
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    if (board[r][c] === EMPTY) {
+                        board[r][c] = player;
+                        if (checkWin(r, c, player)) {
+                            board[r][c] = EMPTY;
+                            return {r, c};
+                        }
+                        board[r][c] = EMPTY;
+                    }
+                }
+            }
+            return null;
+        }
+
+        /* --- 평가 함수 (AI 지능의 핵심) --- */
+        // 패턴 점수
+        const SCORES = {
+            FIVE: 100000000,
+            OPEN_FOUR: 10000000,
+            BLOCKED_FOUR: 500000,
+            OPEN_THREE: 400000,
+            BLOCKED_THREE: 20000,
+            OPEN_TWO: 2000,
+            BLOCKED_TWO: 100
+        };
+
+        function evaluateBoard(bd, player) {
+            let myScore = 0;
+            let opponentScore = 0;
+            const opponent = player === BLACK ? WHITE : BLACK;
+
+            // 가로, 세로, 대각선, 역대각선 스캔
+            // 전체를 스캔하는 것은 비효율적이므로, 돌이 있는 라인만 평가해야 하지만
+            // 구현 단순화를 위해 전체 스캔하되, 패턴 매칭 최적화
+            
+            // 모든 라인을 문자열이나 배열로 추출하여 평가
+            myScore += evaluateLines(bd, player);
+            opponentScore += evaluateLines(bd, opponent);
+
+            // 공격보다 방어 가중치 (상대가 이기려 하면 무조건 막아야 함)
+            return myScore - (opponentScore * 1.2);
+        }
+
+        function evaluateLines(bd, p) {
+            let score = 0;
+            const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]]; // 가로, 세로, 대각, 역대각
+
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    if (bd[r][c] !== p) continue;
+
+                    for (const [dr, dc] of dirs) {
+                        // 이미 검사된 방향인지 체크 (중복 방지)
+                        if (isValid(r - dr, c - dc) && bd[r - dr][c - dc] === p) continue;
+
+                        let count = 0;
+                        let openEnds = 0;
+                        
+                        // 현재 위치부터 방향대로 진행
+                        let i = 0;
+                        while (isValid(r + i*dr, c + i*dc) && bd[r + i*dr][c + i*dc] === p) {
+                            count++;
+                            i++;
+                        }
+
+                        // 양쪽 끝 확인
+                        if (isValid(r - dr, c - dc) && bd[r - dr][c - dc] === EMPTY) openEnds++;
+                        if (isValid(r + i*dr, c + i*dc) && bd[r + i*dr][c + i*dc] === EMPTY) openEnds++;
+
+                        // 중간 빈칸(Broken lines) 체크 (x o x x o 같은 경우)
+                        // 이 코드는 연속된 돌만 체크하지만, 강력한 AI는 떨어진 돌도 체크해야 함.
+                        // 성능상 연속된 돌 위주로 평가하고 가중치를 높임.
+
+                        if (count >= 5) score += SCORES.FIVE;
+                        else if (count === 4) {
+                            if (openEnds === 2) score += SCORES.OPEN_FOUR;
+                            else if (openEnds === 1) score += SCORES.BLOCKED_FOUR;
+                        } else if (count === 3) {
+                            if (openEnds === 2) score += SCORES.OPEN_THREE;
+                            else if (openEnds === 1) score += SCORES.BLOCKED_THREE;
+                        } else if (count === 2) {
+                            if (openEnds === 2) score += SCORES.OPEN_TWO;
+                            else if (openEnds === 1) score += SCORES.BLOCKED_TWO;
+                        }
+                    }
+                }
+            }
+            return score;
+        }
+
+        function checkWin(r, c, p) {
+            const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+            for (const [dr, dc] of dirs) {
+                let count = 1;
+                for (let i = 1; i < 5; i++) {
+                    const nr = r + dr * i, nc = c + dc * i;
+                    if (isValid(nr, nc) && board[nr][nc] === p) count++; else break;
+                }
+                for (let i = 1; i < 5; i++) {
+                    const nr = r - dr * i, nc = c - dc * i;
+                    if (isValid(nr, nc) && board[nr][nc] === p) count++; else break;
+                }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        function isValid(r, c) {
+            return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+        }
+
+        function endGame(msg) {
+            gameActive = false;
+            DOM.winText.innerText = msg;
+            DOM.modal.classList.add('active');
+        }
+
+        function closeModal() {
+            DOM.modal.classList.remove('active');
+        }
+
+        // 게임 시작
+        window.onload = startGame;
+    </script>
+</body>
+</html>
