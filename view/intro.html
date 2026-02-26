@@ -2,23 +2,18 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>Full Screen Video</title>
+<title>Responsive Fullscreen Video</title>
 <style>
-    body, html {
+    html, body {
         margin: 0;
         padding: 0;
         height: 100%;
-        overflow: hidden;
         background: black;
     }
     video {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        min-width: 100%;
-        min-height: 100%;
-        transform: translate(-50%, -50%);
-        object-fit: cover;
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* 화면 비율에 맞게 꽉 채움 */
     }
 </style>
 </head>
