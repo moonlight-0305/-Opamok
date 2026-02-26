@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Full Screen Video</title>
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: black;
+    }
+    video {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        min-width: 100%;
+        min-height: 100%;
+        transform: translate(-50%, -50%);
+        object-fit: cover;
+    }
+</style>
+</head>
+<body>
+
+<video src="https://i.ifh.cc/On1W9Y.mp4" autoplay loop muted playsinline></video>
+
+</body>
+</html>
