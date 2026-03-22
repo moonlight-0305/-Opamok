@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Baduk P2P - 4 Digit Connect</title>
+    <!-- PeerJS Library -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Tailwind CSS for modern UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+
+        :root {
+            --board-color: #e3a857;
+            --stone-black: #1a1a1a;
+            --stone-white: #ffffff;
+            --highlight-color: rgba(255, 255, 255, 0.4);
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #1a1c1e;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        /* Go Board Styles */
+        .baduk-board {
+            background-color: var(--board-color);
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5), inset 0 0 50px rgba(0,0,0,0.1);
+            border: 2px solid #8b5a2b;
+            border-radius: 4px;
+            aspect-ratio: 1 / 1;
+            cursor: crosshair;
+            user-select: none;
+        }
+
+        .grid-line-h, .grid-line-v {
+            position: absolute;
+            background-color: #333;
+            opacity: 0.8;
+        }
+
+        .grid-line-h { height: 1.5px; width: calc(100% - 40px); left: 20px; }
+        .grid-line-v { width: 1.5px; height: calc(100% - 40px); top: 20px; }
+
+        .star-point {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #333;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .stone {
+            position: absolute;
+            width: 92%;
+            height: 92%;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+        }
+
+        .stone.black {
+            background: radial-gradient(circle at 30% 30%, #444, #000);
+            box-shadow: 2px 3px 5px rgba(0,0,0,0.6);
+        }
+
+        .stone.white {
+            background: radial-gradient(circle at 30% 30%, #fff, #ccc);
+            box-shadow: 2px 3px 5px rgba(0,0,0,0.3);
+        }
+
+        .stone.last-move::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40%;
+            height: 40%;
+            border: 2px solid #ff4757;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .ghost-stone {
+            position: absolute;
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.4;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .intersection {
+            position: absolute;
+            width: 5.263%; /* 100/19 */
+            height: 5.263%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        /* UI Components */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-container {
+            height: 300px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+
+        /* Animations */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+
+        .active-turn-indicator {
+            position: relative;
+        }
+        .active-turn-indicator::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border: 2px solid #3b82f6;
+            border-radius: 8px;
+            animation: pulse-ring 2s infinite;
+        }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Top Navigation / Connection Status -->
+    <header class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-lg">
+                <i data-lucide="layout-grid" class="text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight">P2P Baduk <span class="text-blue-500 text-sm font-normal">v1.0.4</span></h1>
+        </div>
+
+        <div id="connection-controls" class="flex flex-wrap items-center gap-4 glass-panel p-3 rounded-xl">
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-400 uppercase font-bold">내 코드:</span>
+                <span id="my-peer-id" class="text-xl font-mono text-blue-400 font-bold tracking-widest">----</span>
+            </div>
+            <div class="h-6 w-px bg-slate-700"></div>
+            <div class="flex items-center gap-2">
+                <input type="text" id="remote-peer-id" placeholder="코드 4자리" maxlength="4" 
+                    class="bg-slate-900 border border-slate-700 rounded px-3 py-1 text-center font-mono w-28 focus:outline-none focus:border-blue-500 transition-all">
+                <button id="btn-connect" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1 rounded font-medium transition-colors flex items-center gap-2">
+                    <i data-lucide="link" class="w-4 h-4"></i> 접속하기
+                </button>
+            </div>
+            <div id="status-indicator" class="flex items-center gap-2 px-2">
+                <div class="w-2 h-2 rounded-full bg-red-500" id="status-dot"></div>
+                <span id="status-text" class="text-xs text-slate-400">대기 중...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Sidebar: Player Info & Tools -->
+        <aside class="lg:col-span-3 space-y-6">
+            <div class="glass-panel p-5 rounded-2xl flex flex-col gap-6">
+                <!-- Player 1 (Black) -->
+                <div id="player-black-card" class="relative p-4 rounded-xl border border-slate-700 transition-all">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-slate-900 border-2 border-slate-600 flex items-center justify-center">
+                            <div class="w-8 h-8 rounded-full bg-stone-900 shadow-lg"></div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400">흑돌 (선수)</p>
+                            <h3 class="font-bold" id="player-black-name">대기 중...</h3>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-between items-end">
+                        <div class="text-sm">
+                            <span class="text-slate-400">포획:</span> <span id="captures-black" class="font-bold text-white">0</span>
+                        </div>
+                        <div id="timer-black" class="text-2xl font-mono text-slate-300">10:00</div>
+                    </div>
+                </div>
+
+                <!-- Player 2 (White) -->
+                <div id="player-white-card" class="relative p-4 rounded-xl border border-slate-700 transition-all">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center">
+                            <div class="w-8 h-8 rounded-full bg-white shadow-md"></div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400">백돌 (후수)</p>
+                            <h3 class="font-bold" id="player-white-name">대기 중...</h3>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex justify-between items-end">
+                        <div class="text-sm">
+                            <span class="text-slate-400">포획:</span> <span id="captures-white" class="font-bold text-white">0</span>
+                            <span class="ml-2 text-blue-400 text-xs">(덤 6.5)</span>
+                        </div>
+                        <div id="timer-white" class="text-2xl font-mono text-slate-300">10:00</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Tools -->
+            <div class="glass-panel p-5 rounded-2xl">
+                <h4 class="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">도구 및 기능</h4>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="btn-pass" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all group">
+                        <i data-lucide="skip-forward" class="mb-1 text-slate-400 group-hover:text-white"></i>
+                        <span class="text-xs">한수쉼</span>
+                    </button>
+                    <button id="btn-resign" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-red-900/30 border border-slate-700 hover:border-red-500/50 transition-all group">
+                        <i data-lucide="flag" class="mb-1 text-slate-400 group-hover:text-red-400"></i>
+                        <span class="text-xs">기권</span>
+                    </button>
+                    <button id="btn-counting" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-blue-900/30 border border-slate-700 hover:border-blue-500/50 transition-all group">
+                        <i data-lucide="calculator" class="mb-1 text-slate-400 group-hover:text-blue-400"></i>
+                        <span class="text-xs">계가</span>
+                    </button>
+                    <button id="btn-undo" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all group">
+                        <i data-lucide="undo-2" class="mb-1 text-slate-400 group-hover:text-white"></i>
+                        <span class="text-xs">무르기</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: Go Board -->
+        <div class="lg:col-span-6 flex flex-col items-center">
+            <div id="game-board-container" class="w-full max-w-[650px] relative">
+                <div id="baduk-board" class="baduk-board w-full">
+                    <!-- Lines and Stars will be generated by JS -->
+                </div>
+                
+                <!-- Coordinates -->
+                <div class="flex justify-between w-full px-5 mt-2 text-[10px] text-slate-500 font-mono uppercase">
+                    <span>A B C D E F G H J K L M N O P Q R S T</span>
+                </div>
+            </div>
+
+            <div class="mt-8 w-full max-w-[650px] flex justify-between items-center glass-panel px-6 py-4 rounded-2xl">
+                <div class="flex items-center gap-4">
+                    <button id="history-first" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevrons-left"></i></button>
+                    <button id="history-prev" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevron-left"></i></button>
+                    <div class="bg-slate-900 px-4 py-1 rounded-full border border-slate-700">
+                        <span id="move-count" class="font-mono font-bold text-blue-400">0</span> <span class="text-xs text-slate-500">수</span>
+                    </div>
+                    <button id="history-next" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevron-right"></i></button>
+                    <button id="history-last" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevrons-right"></i></button>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-save-sgf" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg transition-colors flex items-center gap-1">
+                        <i data-lucide="download" class="w-3 h-3"></i> 기보 저장
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar: Logs & Chat -->
+        <aside class="lg:col-span-3 space-y-6">
+            <!-- Game Log -->
+            <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-[300px]">
+                <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400">대국 로그</h4>
+                    <i data-lucide="scroll-text" class="w-3 h-3 text-slate-500"></i>
+                </div>
+                <div id="game-logs" class="chat-container custom-scroll p-4 text-xs space-y-2 font-mono">
+                    <div class="text-blue-400">[시스템] 대국 대기 중입니다...</div>
+                </div>
+            </div>
+
+            <!-- Chat -->
+            <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-[400px]">
+                <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
+                    <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400">실시간 채팅</h4>
+                    <i data-lucide="message-square" class="w-3 h-3 text-slate-500"></i>
+                </div>
+                <div id="chat-messages" class="chat-container custom-scroll p-4 space-y-3 flex-grow">
+                    <!-- Messages -->
+                </div>
+                <form id="chat-form" class="p-3 bg-slate-900/50 flex gap-2">
+                    <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." 
+                        class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:border-blue-500">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition-colors">
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                    </button>
+                </form>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Modal for Settings & Results -->
+    <div id="result-modal" class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div class="glass-panel max-w-md w-full rounded-3xl p-8 shadow-2xl scale-in transform transition-transform border-2 border-blue-500/30">
+            <div class="flex flex-col items-center text-center">
+                <div id="result-icon" class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mb-6">
+                    <i data-lucide="trophy" class="text-white w-10 h-10"></i>
+                </div>
+                <h2 id="result-title" class="text-3xl font-bold mb-2">대국 종료</h2>
+                <p id="result-score" class="text-slate-400 mb-8">결과를 계산 중입니다...</p>
+                
+                <div class="w-full grid grid-cols-2 gap-4 mb-8">
+                    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+                        <p class="text-xs text-slate-500 uppercase mb-1">흑 (집)</p>
+                        <span id="final-black-score" class="text-xl font-bold">0.0</span>
+                    </div>
+                    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
+                        <p class="text-xs text-slate-500 uppercase mb-1">백 (집 + 덤)</p>
+                        <span id="final-white-score" class="text-xl font-bold">6.5</span>
+                    </div>
+                </div>
+
+                <button onclick="closeModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold transition-colors">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration & Constants ---
+        const BOARD_SIZE = 19;
+        const GRID_STEP = 100 / (BOARD_SIZE + 1);
+        const PADDING = GRID_STEP;
+        const KOMI = 6.5;
+
+        // --- Game State ---
+        let gameState = {
+            board: Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0)), // 0: empty, 1: black, 2: white
+            history: [],
+            currentTurn: 1, // 1: black, 2: white
+            myColor: null, // assigned when connected
+            moveCount: 0,
+            captures: { 1: 0, 2: 0 },
+            koPoint: null,
+            isGameOver: false,
+            timers: { 1: 600, 2: 600 },
+            timerInterval: null
+        };
+
+        // --- PeerJS Logic ---
+        let peer = null;
+        let conn = null;
+        const myPeerIdDisplay = document.getElementById('my-peer-id');
+        const remoteIdInput = document.getElementById('remote-peer-id');
+        const connectBtn = document.getElementById('btn-connect');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+
+        function generateShortId() {
+            return Math.floor(1000 + Math.random() * 9000).toString();
+        }
+
+        function initPeer() {
+            const shortId = generateShortId();
+            peer = new Peer('baduk-' + shortId);
+            
+            peer.on('open', (id) => {
+                myPeerIdDisplay.textContent = shortId;
+                addLog(`내 접속 코드: ${shortId}`);
+            });
+
+            peer.on('connection', (c) => {
+                if (conn) {
+                    c.close(); // Only one opponent
+                    return;
+                }
+                conn = c;
+                setupConnection();
+                gameState.myColor = 1; // Host is Black
+                updateUIForStart();
+                addLog("상대방이 접속했습니다. 당신은 흑돌입니다.");
+            });
+
+            peer.on('error', (err) => {
+                console.error(err);
+                addLog("연결 오류: " + err.type);
+            });
+        }
+
+        function setupConnection() {
+            conn.on('open', () => {
+                statusDot.className = "w-2 h-2 rounded-full bg-green-500";
+                statusText.textContent = "연결됨";
+                
+                if (!gameState.myColor) {
+                    gameState.myColor = 2; // Guest is White
+                    updateUIForStart();
+                    addLog("서버에 접속했습니다. 당신은 백돌입니다.");
+                }
+            });
+
+            conn.on('data', (data) => {
+                handleIncomingData(data);
+            });
+
+            conn.on('close', () => {
+                addLog("연결이 끊어졌습니다.");
+                statusDot.className = "w-2 h-2 rounded-full bg-red-500";
+                statusText.textContent = "연결 끊김";
+                conn = null;
+            });
+        }
+
+        function handleIncomingData(data) {
+            switch(data.type) {
+                case 'MOVE':
+                    processMove(data.x, data.y, false);
+                    break;
+                case 'PASS':
+                    processPass(false);
+                    break;
+                case 'UNDO':
+                    if (confirm("상대방이 무르기를 요청했습니다. 허락하시겠습니까?")) {
+                        undoMove();
+                        sendData({ type: 'UNDO_ACCEPT' });
+                    }
+                    break;
+                case 'UNDO_ACCEPT':
+                    undoMove();
+                    addLog("무르기가 승인되었습니다.");
+                    break;
+                case 'CHAT':
+                    addChatMessage(data.sender, data.text);
+                    break;
+                case 'RESIGN':
+                    endGame('RESIGN', data.sender);
+                    break;
+                case 'COUNT_REQ':
+                    if(confirm("상대방이 계가를 요청했습니다. 수락하시겠습니까?")) {
+                        calculateScore();
+                        sendData({ type: 'COUNT_SYNC' });
+                    }
+                    break;
+                case 'COUNT_SYNC':
+                    calculateScore();
+                    break;
+            }
+        }
+
+        function sendData(data) {
+            if (conn && conn.open) {
+                conn.send(data);
+            }
+        }
+
+        // --- Baduk Logic Engine ---
+        function createBoard() {
+            const boardEl = document.getElementById('baduk-board');
+            boardEl.innerHTML = '';
+
+            // Draw Grid Lines
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                const pos = PADDING + (i * GRID_STEP);
+                
+                const hLine = document.createElement('div');
+                hLine.className = 'grid-line-h';
+                hLine.style.top = `${pos}%`;
+                boardEl.appendChild(hLine);
+
+                const vLine = document.createElement('div');
+                vLine.className = 'grid-line-v';
+                vLine.style.left = `${pos}%`;
+                boardEl.appendChild(vLine);
+            }
+
+            // Star points
+            const stars = [3, 9, 15];
+            stars.forEach(r => {
+                stars.forEach(c => {
+                    const star = document.createElement('div');
+                    star.className = 'star-point';
+                    star.style.top = `${PADDING + (r * GRID_STEP)}%`;
+                    star.style.left = `${PADDING + (c * GRID_STEP)}%`;
+                    boardEl.appendChild(star);
+                });
+            });
+
+            // Intersections for clicking
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    const intersect = document.createElement('div');
+                    intersect.className = 'intersection';
+                    intersect.style.top = `${PADDING + (y * GRID_STEP)}%`;
+                    intersect.style.left = `${PADDING + (x * GRID_STEP)}%`;
+                    intersect.dataset.x = x;
+                    intersect.dataset.y = y;
+
+                    intersect.addEventListener('mouseenter', () => showGhost(x, y));
+                    intersect.addEventListener('mouseleave', clearGhost);
+                    intersect.addEventListener('click', () => handleBoardClick(x, y));
+
+                    boardEl.appendChild(intersect);
+                }
+            }
+        }
+
+        function handleBoardClick(x, y) {
+            if (gameState.isGameOver) return;
+            if (gameState.currentTurn !== gameState.myColor) return;
+            if (gameState.board[y][x] !== 0) return;
+
+            // Basic move validation
+            if (isValidMove(x, y, gameState.currentTurn)) {
+                processMove(x, y, true);
+                sendData({ type: 'MOVE', x, y });
+            } else {
+                addLog("착수할 수 없는 곳입니다.");
+            }
+        }
+
+        function isValidMove(x, y, color) {
+            // 1. Check Ko
+            if (gameState.koPoint && gameState.koPoint.x === x && gameState.koPoint.y === y) {
+                return false;
+            }
+
+            // Temporary place stone
+            const originalBoard = JSON.parse(JSON.stringify(gameState.board));
+            gameState.board[y][x] = color;
+
+            const opponent = color === 1 ? 2 : 1;
+            const captured = findCapturedStones(x, y, opponent);
+            
+            let valid = false;
+            if (captured.length > 0) {
+                // Capturing makes it valid
+                valid = true;
+            } else {
+                // If no capture, check if the stone itself has liberties
+                const liberties = getLiberties(x, y, color);
+                if (liberties.length > 0) {
+                    valid = true;
+                }
+            }
+
+            // Restore board
+            gameState.board = originalBoard;
+            return valid;
+        }
+
+        function findCapturedStones(lastX, lastY, opponentColor) {
+            let captured = [];
+            const neighbors = [[lastX+1, lastY], [lastX-1, lastY], [lastX, lastY+1], [lastX, lastY-1]];
+
+            neighbors.forEach(([nx, ny]) => {
+                if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                    if (gameState.board[ny][nx] === opponentColor) {
+                        const group = getGroup(nx, ny, opponentColor);
+                        const liberties = getLibertiesOfGroup(group);
+                        if (liberties.length === 0) {
+                            group.forEach(stone => {
+                                if (!captured.some(s => s.x === stone.x && s.y === stone.y)) {
+                                    captured.push(stone);
+                                }
+                            });
+                        }
+                    }
+                }
+            });
+            return captured;
+        }
+
+        function getGroup(x, y, color) {
+            const group = [];
+            const visited = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(false));
+            const stack = [{x, y}];
+
+            while (stack.length > 0) {
+                const curr = stack.pop();
+                if (visited[curr.y][curr.x]) continue;
+                visited[curr.y][curr.x] = true;
+                group.push(curr);
+
+                const neighbors = [[curr.x+1, curr.y], [curr.x-1, curr.y], [curr.x, curr.y+1], [curr.x, curr.y-1]];
+                neighbors.forEach(([nx, ny]) => {
+                    if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                        if (gameState.board[ny][nx] === color && !visited[ny][nx]) {
+                            stack.push({x: nx, y: ny});
+                        }
+                    }
+                });
+            }
+            return group;
+        }
+
+        function getLibertiesOfGroup(group) {
+            const liberties = new Set();
+            group.forEach(stone => {
+                const neighbors = [[stone.x+1, stone.y], [stone.x-1, stone.y], [stone.x, stone.y+1], [stone.x, stone.y-1]];
+                neighbors.forEach(([nx, ny]) => {
+                    if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                        if (gameState.board[ny][nx] === 0) {
+                            liberties.add(`${nx},${ny}`);
+                        }
+                    }
+                });
+            });
+            return Array.from(liberties);
+        }
+
+        function getLiberties(x, y, color) {
+            return getLibertiesOfGroup(getGroup(x, y, color));
+        }
+
+        function processMove(x, y, isMyMove) {
+            const color = gameState.currentTurn;
+            const opponent = color === 1 ? 2 : 1;
+
+            // Update board
+            gameState.board[y][x] = color;
+            
+            // Handle captures
+            const captured = findCapturedStones(x, y, opponent);
+            captured.forEach(stone => {
+                gameState.board[stone.y][stone.x] = 0;
+                gameState.captures[color]++;
+            });
+
+            // Handle Ko rule
+            if (captured.length === 1) {
+                // If exactly 1 stone captured, might be a Ko
+                const group = getGroup(x, y, color);
+                if (group.length === 1) {
+                    const libs = getLibertiesOfGroup(group);
+                    if (libs.length === 1) {
+                        gameState.koPoint = captured[0];
+                    } else {
+                        gameState.koPoint = null;
+                    }
+                } else {
+                    gameState.koPoint = null;
+                }
+            } else {
+                gameState.koPoint = null;
+            }
+
+            // Log & History
+            const posName = String.fromCharCode(65 + (x >= 8 ? x + 1 : x)) + (BOARD_SIZE - y);
+            addLog(`${color === 1 ? '흑' : '백'}: ${posName} 착수`);
+            
+            gameState.history.push({
+                type: 'MOVE',
+                x, y,
+                color,
+                captured: captured,
+                koBefore: gameState.koPoint
+            });
+            
+            gameState.moveCount++;
+            gameState.currentTurn = opponent;
+            
+            renderBoard();
+            updateUI();
+            startTimer();
+        }
+
+        function processPass(isMyMove) {
+            const color = gameState.currentTurn;
+            addLog(`${color === 1 ? '흑' : '백'}: 한수쉼`);
+            
+            gameState.history.push({ type: 'PASS', color });
+            gameState.moveCount++;
+            gameState.currentTurn = color === 1 ? 2 : 1;
+            
+            // Two consecutive passes end the game
+            const len = gameState.history.length;
+            if (len >= 2 && gameState.history[len-1].type === 'PASS' && gameState.history[len-2].type === 'PASS') {
+                calculateScore();
+            }
+
+            if (isMyMove) sendData({ type: 'PASS' });
+            updateUI();
+            startTimer();
+        }
+
+        function undoMove() {
+            if (gameState.history.length === 0) return;
+            
+            const last = gameState.history.pop();
+            if (last.type === 'MOVE') {
+                gameState.board[last.y][last.x] = 0;
+                last.captured.forEach(stone => {
+                    gameState.board[stone.y][stone.x] = last.color === 1 ? 2 : 1;
+                    gameState.captures[last.color]--;
+                });
+                gameState.koPoint = last.koBefore;
+            }
+            
+            gameState.moveCount--;
+            gameState.currentTurn = last.color;
+            renderBoard();
+            updateUI();
+        }
+
+        // --- UI Rendering ---
+        function renderBoard() {
+            // Remove existing stones
+            const stones = document.querySelectorAll('.stone');
+            stones.forEach(s => s.remove());
+
+            const boardEl = document.getElementById('baduk-board');
+            const lastMove = gameState.history[gameState.history.length - 1];
+
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (gameState.board[y][x] !== 0) {
+                        const stone = document.createElement('div');
+                        const colorClass = gameState.board[y][x] === 1 ? 'black' : 'white';
+                        stone.className = `stone ${colorClass}`;
+                        
+                        if (lastMove && lastMove.type === 'MOVE' && lastMove.x === x && lastMove.y === y) {
+                            stone.classList.add('last-move');
+                        }
+
+                        stone.style.top = `${PADDING + (y * GRID_STEP)}%`;
+                        stone.style.left = `${PADDING + (x * GRID_STEP)}%`;
+                        boardEl.appendChild(stone);
+                    }
+                }
+            }
+        }
+
+        function showGhost(x, y) {
+            if (gameState.board[y][x] !== 0 || gameState.currentTurn !== gameState.myColor || gameState.isGameOver) return;
+            
+            clearGhost();
+            const ghost = document.createElement('div');
+            ghost.id = 'ghost-stone';
+            ghost.className = `stone ${gameState.myColor === 1 ? 'black' : 'white'} opacity-40 pointer-events-none`;
+            ghost.style.top = `${PADDING + (y * GRID_STEP)}%`;
+            ghost.style.left = `${PADDING + (x * GRID_STEP)}%`;
+            document.getElementById('baduk-board').appendChild(ghost);
+        }
+
+        function clearGhost() {
+            const ghost = document.getElementById('ghost-stone');
+            if (ghost) ghost.remove();
+        }
+
+        function updateUI() {
+            document.getElementById('move-count').textContent = gameState.moveCount;
+            document.getElementById('captures-black').textContent = gameState.captures[1];
+            document.getElementById('captures-white').textContent = gameState.captures[2];
+
+            // Turn Indicator
+            const blackCard = document.getElementById('player-black-card');
+            const whiteCard = document.getElementById('player-white-card');
+
+            if (gameState.currentTurn === 1) {
+                blackCard.classList.add('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
+                whiteCard.classList.remove('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
+            } else {
+                whiteCard.classList.add('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
+                blackCard.classList.remove('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
+            }
+        }
+
+        function updateUIForStart() {
+            document.getElementById('player-black-name').textContent = gameState.myColor === 1 ? "나 (Host)" : "상대방";
+            document.getElementById('player-white-name').textContent = gameState.myColor === 2 ? "나 (Guest)" : "상대방";
+            updateUI();
+            startTimer();
+        }
+
+        // --- Timer & Logic ---
+        function startTimer() {
+            clearInterval(gameState.timerInterval);
+            gameState.timerInterval = setInterval(() => {
+                if (gameState.isGameOver) return;
+                
+                gameState.timers[gameState.currentTurn]--;
+                updateTimerDisplay();
+
+                if (gameState.timers[gameState.currentTurn] <= 0) {
+                    endGame('TIMEOUT', gameState.currentTurn === 1 ? 2 : 1);
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const formatTime = (s) => {
+                const min = Math.floor(s / 60);
+                const sec = s % 60;
+                return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+            };
+            document.getElementById('timer-black').textContent = formatTime(gameState.timers[1]);
+            document.getElementById('timer-white').textContent = formatTime(gameState.timers[2]);
+        }
+
+        // --- Score Calculation (Simple Territory) ---
+        function calculateScore() {
+            // This is a simplified BFS territory counting
+            const board = JSON.parse(JSON.stringify(gameState.board));
+            let blackTerritory = 0;
+            let whiteTerritory = 0;
+            const visited = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(false));
+
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (board[y][x] === 0 && !visited[y][x]) {
+                        const {area, owners} = floodFillTerritory(x, y, visited);
+                        if (owners.size === 1) {
+                            if (owners.has(1)) blackTerritory += area.length;
+                            if (owners.has(2)) whiteTerritory += area.length;
+                        }
+                    }
+                }
+            }
+
+            const blackTotal = blackTerritory + gameState.captures[1];
+            const whiteTotal = whiteTerritory + gameState.captures[2] + KOMI;
+
+            showResult(blackTotal, whiteTotal);
+        }
+
+        function floodFillTerritory(x, y, globalVisited) {
+            const area = [];
+            const owners = new Set();
+            const stack = [{x, y}];
+            const localVisited = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(false));
+
+            while (stack.length > 0) {
+                const curr = stack.pop();
+                if (curr.x < 0 || curr.x >= BOARD_SIZE || curr.y < 0 || curr.y >= BOARD_SIZE) continue;
+                if (localVisited[curr.y][curr.x]) continue;
+
+                if (gameState.board[curr.y][curr.x] !== 0) {
+                    owners.add(gameState.board[curr.y][curr.x]);
+                    continue;
+                }
+
+                localVisited[curr.y][curr.x] = true;
+                globalVisited[curr.y][curr.x] = true;
+                area.push(curr);
+
+                stack.push({x: curr.x+1, y: curr.y}, {x: curr.x-1, y: curr.y}, {x: curr.x, y: curr.y+1}, {x: curr.x, y: curr.y-1});
+            }
+            return {area, owners};
+        }
+
+        // --- Utility UI ---
+        function addLog(msg) {
+            const logBox = document.getElementById('game-logs');
+            const entry = document.createElement('div');
+            const time = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            entry.innerHTML = `<span class="text-slate-500">[${time}]</span> ${msg}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function addChatMessage(sender, text) {
+            const chatBox = document.getElementById('chat-messages');
+            const entry = document.createElement('div');
+            const isMe = sender === (gameState.myColor === 1 ? "흑" : "백");
+            
+            entry.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+            entry.innerHTML = `
+                <span class="text-[10px] text-slate-500 mb-1">${sender}</span>
+                <div class="${isMe ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200'} px-3 py-2 rounded-2xl text-sm max-w-[80%]">
+                    ${text}
+                </div>
+            `;
+            chatBox.appendChild(entry);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function showResult(black, white) {
+            gameState.isGameOver = true;
+            clearInterval(gameState.timerInterval);
+
+            const modal = document.getElementById('result-modal');
+            const title = document.getElementById('result-title');
+            const scoreText = document.getElementById('result-score');
+            
+            document.getElementById('final-black-score').textContent = black.toFixed(1);
+            document.getElementById('final-white-score').textContent = white.toFixed(1);
+
+            const winner = black > white ? "흑" : "백";
+            const diff = Math.abs(black - white).toFixed(1);
+
+            title.textContent = `${winner} 불계승!`;
+            scoreText.textContent = `${winner}이 ${diff}집 차이로 승리하였습니다.`;
+            
+            modal.style.display = 'flex';
+        }
+
+        function endGame(reason, winnerColor) {
+            gameState.isGameOver = true;
+            clearInterval(gameState.timerInterval);
+            
+            const winner = winnerColor === 1 ? "흑" : "백";
+            let msg = "";
+            if (reason === 'RESIGN') msg = `${winner} 불계승 (상대 기권)`;
+            if (reason === 'TIMEOUT') msg = `${winner} 시간승`;
+
+            alert(msg);
+            addLog(`대국 종료: ${msg}`);
+        }
+
+        function closeModal() {
+            document.getElementById('result-modal').style.display = 'none';
+        }
+
+        // --- Event Listeners ---
+        connectBtn.addEventListener('click', () => {
+            const id = remoteIdInput.value.trim();
+            if (id.length === 4) {
+                conn = peer.connect('baduk-' + id);
+                setupConnection();
+            } else {
+                alert("4자리 숫자 코드를 입력해주세요.");
+            }
+        });
+
+        document.getElementById('chat-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (text && conn) {
+                const sender = gameState.myColor === 1 ? "흑" : "백";
+                addChatMessage(sender, text);
+                sendData({ type: 'CHAT', sender, text });
+                input.value = '';
+            }
+        });
+
+        document.getElementById('btn-pass').addEventListener('click', () => {
+            if (gameState.currentTurn === gameState.myColor && !gameState.isGameOver) {
+                processPass(true);
+            }
+        });
+
+        document.getElementById('btn-resign').addEventListener('click', () => {
+            if (confirm("정말 기권하시겠습니까?")) {
+                const winner = gameState.myColor === 1 ? 2 : 1;
+                endGame('RESIGN', winner);
+                sendData({ type: 'RESIGN', sender: winner });
+            }
+        });
+
+        document.getElementById('btn-undo').addEventListener('click', () => {
+            if (gameState.history.length > 0 && !gameState.isGameOver) {
+                sendData({ type: 'UNDO' });
+                addLog("무르기를 요청했습니다...");
+            }
+        });
+
+        document.getElementById('btn-counting').addEventListener('click', () => {
+            if (!gameState.isGameOver) {
+                sendData({ type: 'COUNT_REQ' });
+                addLog("상대방에게 계가를 요청했습니다.");
+            }
+        });
+
+        document.getElementById('btn-save-sgf').addEventListener('click', () => {
+            // Simple SGF Generator
+            let sgf = `(;GM[1]FF[4]SZ[19]KM[${KOMI}]RU[Japanese]\n`;
+            gameState.history.forEach(m => {
+                if (m.type === 'MOVE') {
+                    const x = String.fromCharCode(97 + m.x);
+                    const y = String.fromCharCode(97 + m.y);
+                    sgf += `;${m.color === 1 ? 'B' : 'W'}[${x}${y}]`;
+                } else if (m.type === 'PASS') {
+                    sgf += `;${m.color === 1 ? 'B' : 'W'}[]`;
+                }
+            });
+            sgf += ")";
+            
+            const blob = new Blob([sgf], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `baduk_game_${new Date().getTime()}.sgf`;
+            a.click();
+        });
+
+        // --- Init ---
+        window.onload = () => {
+            initPeer();
+            createBoard();
+            lucide.createIcons();
+            addLog("환영합니다! 상단의 코드를 공유하여 대국을 시작하세요.");
+        };
+    </script>
+</body>
+</html>
