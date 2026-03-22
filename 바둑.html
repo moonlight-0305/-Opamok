@@ -3,997 +3,1068 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Professional Baduk P2P - 4-Digit Connection</title>
+    <title>Professional Baduk P2P Ultimate v2.5</title>
     <!-- 외부 라이브러리 로드 -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@100;300;400;600;700;900&display=swap');
 
         :root {
             --board-bg: #e3a857;
-            --board-line: #2d2419;
-            --stone-black: radial-gradient(circle at 30% 30%, #444, #000);
-            --stone-white: radial-gradient(circle at 30% 30%, #fff, #ddd);
-            --panel-bg: #111827;
-            --sidebar-width: 400px;
+            --board-accent: #c48c41;
+            --line-color: rgba(30, 20, 10, 0.9);
+            --black-stone: radial-gradient(circle at 30% 30%, #444 0%, #000 70%, #000 100%);
+            --white-stone: radial-gradient(circle at 30% 30%, #fff 0%, #eee 60%, #ccc 100%);
+            --active-glow: 0 0 15px rgba(59, 130, 246, 0.5);
         }
 
         body {
             font-family: 'Pretendard', sans-serif;
-            background-color: #030712;
-            color: #f3f4f6;
+            background-color: #020617;
+            color: #f1f5f9;
             margin: 0;
-            padding: 0;
-            height: 100vh;
-            overflow: hidden; /* 전체 스크롤 방지 */
+            overflow: hidden;
             display: flex;
+            height: 100vh;
         }
 
-        /* 메인 레이아웃: 왼쪽 바둑판, 오른쪽 사이드바 */
+        /* 메인 레이아웃 */
         .app-container {
             display: flex;
             width: 100%;
             height: 100vh;
         }
 
-        /* 왼쪽 바둑판 영역 (고정) */
-        .board-section {
+        /* 왼쪽: 대국장 */
+        .game-area {
             flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #0f172a;
-            padding: 20px;
             position: relative;
-        }
-
-        /* 오른쪽 사이드바 영역 (스크롤 가능) */
-        .sidebar-section {
-            width: var(--sidebar-width);
-            background-color: var(--panel-bg);
-            border-left: 1px solid #374151;
             display: flex;
             flex-direction: column;
-            height: 100vh;
-            overflow-y: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #4b5563 transparent;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+            padding: 20px;
         }
 
-        .sidebar-section::-webkit-scrollbar {
-            width: 6px;
-        }
-        .sidebar-section::-webkit-scrollbar-thumb {
-            background-color: #4b5563;
-            border-radius: 10px;
+        /* 오른쪽: 대국 정보창 */
+        .sidebar {
+            width: 450px;
+            background: #0f172a;
+            border-left: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            box-shadow: -10px 0 50px rgba(0,0,0,0.5);
+            z-index: 100;
         }
 
-        /* 바둑판 스타일링 */
-        .baduk-board-wrapper {
+        /* 바둑판 (Board) */
+        .board-wrapper {
             position: relative;
-            width: 90vmin;
-            height: 90vmin;
-            max-width: 800px;
-            max-height: 800px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
-        }
-
-        .baduk-board {
+            width: 88vmin;
+            height: 88vmin;
+            max-width: 820px;
+            max-height: 820px;
             background-color: var(--board-bg);
-            width: 100%;
-            height: 100%;
-            position: relative;
-            border: 4px solid #8b5e34;
+            border: 5px solid #63442d;
             border-radius: 4px;
+            box-shadow: 
+                0 50px 100px -20px rgba(0,0,0,0.7),
+                inset 0 0 80px rgba(0,0,0,0.15);
+            cursor: none; /* 커스텀 고스트 돌 사용 */
         }
 
-        /* 바둑판 선(Line) */
-        .line-h, .line-v {
+        /* 격자선 */
+        .grid-line {
             position: absolute;
-            background-color: var(--board-line);
-            opacity: 0.7;
+            background-color: var(--line-color);
+            z-index: 1;
         }
-        .line-h { height: 1px; width: calc(100% - 40px); left: 20px; }
-        .line-v { width: 1px; height: calc(100% - 40px); top: 20px; }
+        .line-h { height: 1.2px; width: calc(100% - (100% / 19)); left: calc(100% / 38); }
+        .line-v { width: 1.2px; height: calc(100% - (100% / 19)); top: calc(100% / 38); }
 
-        /* 화점(Star points) */
-        .star-point {
+        /* 화점 */
+        .hoshi {
             position: absolute;
-            width: 8px;
-            height: 8px;
-            background-color: var(--board-line);
+            width: 1.2%;
+            height: 1.2%;
+            background-color: var(--line-color);
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            z-index: 5;
+            z-index: 2;
         }
 
-        /* 돌(Stone) 스타일 */
+        /* 바둑알 (Stone) - 정밀 크기 92% 적용 */
         .stone {
             position: absolute;
-            width: 94%;
-            height: 94%;
+            width: 4.85%; /* 19개 격자에 최적화된 황금비율 */
+            height: 4.85%;
             border-radius: 50%;
-            transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%) scale(0);
             z-index: 10;
-            transition: transform 0.1s ease-out;
+            transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.2);
         }
+        .stone.placed { transform: translate(-50%, -50%) scale(1); }
 
         .stone.black {
-            background: var(--stone-black);
-            box-shadow: 2px 4px 6px rgba(0,0,0,0.5);
+            background: var(--black-stone);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.6), inset -1px -1px 3px rgba(255,255,255,0.1);
         }
 
         .stone.white {
-            background: var(--stone-white);
-            box-shadow: 2px 4px 6px rgba(0,0,0,0.3);
+            background: var(--white-stone);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.3), inset -1px -1px 2px rgba(0,0,0,0.1);
         }
 
-        .stone.last-move::after {
-            content: '';
+        /* 고스트 돌 (마우스 가이드) */
+        .ghost-stone {
+            position: absolute;
+            width: 4.85%;
+            height: 4.85%;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0.5;
+            z-index: 5;
+            pointer-events: none;
+            display: none;
+        }
+
+        /* 마지막 수 마커 */
+        .last-move-marker {
             position: absolute;
             top: 50%;
             left: 50%;
             width: 35%;
             height: 35%;
-            border: 2px solid #ef4444;
             border-radius: 50%;
             transform: translate(-50%, -50%);
+            border: 2px solid #ef4444;
+            animation: pulse-red 2s infinite;
         }
 
-        /* 교차점(Intersection) - 클릭 레이어 */
-        .intersection {
+        @keyframes pulse-red {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.4); opacity: 0.4; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        /* 좌표 텍스트 */
+        .coord-label {
             position: absolute;
-            width: 5.26%;
-            height: 5.26%;
-            transform: translate(-50%, -50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            z-index: 20;
-        }
-
-        .ghost-stone {
-            opacity: 0.4;
+            font-size: 11px;
+            font-weight: 800;
+            color: rgba(0,0,0,0.3);
+            font-family: 'Monaco', 'Consolas', monospace;
             pointer-events: none;
         }
 
-        /* 사이드바 컴포넌트들 */
-        .section-card {
-            background: rgba(31, 41, 55, 0.5);
-            margin: 12px;
-            padding: 16px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+        /* 스크롤바 커스텀 */
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* 상태 카드 애니메이션 */
+        .player-card {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+        .player-card.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.1);
         }
 
-        .status-badge {
-            padding: 2px 8px;
-            border-radius: 9999px;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
+        /* 모달 레이어 */
+        .modal-bg {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
         }
 
-        /* 애니메이션 */
-        @keyframes stone-drop {
-            0% { transform: translate(-50%, -70%); opacity: 0; }
-            100% { transform: translate(-50%, -50%); opacity: 1; }
+        /* 로딩 애니메이션 */
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 3px solid #FFF;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
         }
 
-        .animate-drop {
-            animation: stone-drop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
-        .pulse-turn {
-            box-shadow: 0 0 0 2px #3b82f6;
-            animation: pulse 2s infinite;
+        /* 타점(Intersections) 하이라이트 */
+        .intersection-hit {
+            position: absolute;
+            z-index: 3;
+            cursor: pointer;
+        }
+        .intersection-hit:hover {
+            background: rgba(255,255,255,0.1);
         }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
-            100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); }
-        }
-
-        /* 채팅 및 로그 높이 고정 */
-        .scroll-box {
-            height: 200px;
-            overflow-y: auto;
-            font-size: 13px;
-        }
     </style>
 </head>
 <body>
 
     <div class="app-container">
         
-        <!-- [LEFT] 바둑판 영역 -->
-        <section class="board-section">
-            <div class="baduk-board-wrapper">
-                <!-- 좌표 레이블 (Top) -->
-                <div class="absolute -top-6 left-0 w-full flex justify-around text-[10px] text-gray-500 font-mono px-5">
-                    <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span><span>P</span><span>Q</span><span>R</span><span>S</span><span>T</span>
-                </div>
-                
-                <div id="baduk-board" class="baduk-board">
-                    <!-- JS에서 그리드 및 돌 생성 -->
-                </div>
-
-                <!-- 좌표 레이블 (Left) -->
-                <div class="absolute top-0 -left-6 h-full flex flex-col justify-around text-[10px] text-gray-500 font-mono py-5">
-                    <span>19</span><span>18</span><span>17</span><span>16</span><span>15</span><span>14</span><span>13</span><span>12</span><span>11</span><span>10</span><span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
-                </div>
-            </div>
-
-            <!-- 하단 플로팅 정보 바 -->
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 shadow-2xl">
-                <div class="flex items-center gap-2">
-                    <span class="w-3 h-3 rounded-full bg-blue-500" id="conn-dot"></span>
-                    <span id="conn-status" class="text-xs font-bold text-gray-300">오프라인</span>
-                </div>
-                <div class="w-px h-4 bg-gray-700"></div>
-                <div class="text-xs font-mono text-blue-400 font-bold" id="current-move-display">0 MOVE</div>
-            </div>
-        </section>
-
-        <!-- [RIGHT] 사이드바 영역 (스크롤 가능) -->
-        <section class="sidebar-section custom-scroll">
+        <!-- 왼쪽: 메인 바둑판 영역 -->
+        <section class="game-area">
             
-            <!-- 1. 연결 설정 헤더 -->
-            <div class="p-6 border-b border-gray-800 bg-gray-900/50">
-                <div class="flex items-center justify-between mb-4">
-                    <h1 class="text-xl font-bold flex items-center gap-2">
-                        <i data-lucide="monitor-play" class="text-blue-500"></i> P2P Baduk
-                    </h1>
-                    <span class="text-[10px] bg-blue-600/20 text-blue-400 px-2 py-1 rounded uppercase tracking-tighter">Pro Edition</span>
+            <!-- 상단 정보 헤더 -->
+            <div class="absolute top-8 w-full px-12 flex justify-between items-center z-50">
+                <div class="flex items-center gap-4 bg-slate-900/80 backdrop-blur px-6 py-3 rounded-2xl border border-slate-700 shadow-2xl">
+                    <div id="p2p-status-dot" class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]"></div>
+                    <span id="p2p-status-text" class="text-[11px] font-black uppercase tracking-widest text-slate-400">Not Connected</span>
+                    <div class="w-px h-4 bg-slate-700 mx-2"></div>
+                    <span id="move-indicator" class="font-mono text-sm font-bold text-blue-400 tracking-tighter">MOVE #000</span>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <label class="block text-[10px] text-gray-500 uppercase font-bold mb-1">내 접속 코드</label>
-                        <div id="my-peer-id" class="text-2xl font-mono font-black text-white tracking-widest">----</div>
-                    </div>
-                    <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
-                        <label class="block text-[10px] text-gray-500 uppercase font-bold mb-1">상대방 연결</label>
-                        <div class="flex gap-2">
-                            <input type="text" id="remote-peer-id" maxlength="4" placeholder="0000" 
-                                class="bg-transparent text-xl font-mono text-blue-400 w-full outline-none focus:ring-0">
-                            <button id="btn-connect" class="text-blue-500 hover:text-blue-400"><i data-lucide="arrow-right-circle"></i></button>
-                        </div>
-                    </div>
-                </div>
-                <button id="btn-copy-id" class="w-full py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs font-semibold flex items-center justify-center gap-2 transition-all">
-                    <i data-lucide="copy" class="w-3 h-3"></i> 접속 코드 복사하기
-                </button>
-            </div>
-
-            <!-- 2. 플레이어 상태 카드 -->
-            <div class="section-card space-y-4">
-                <div id="card-black" class="p-4 rounded-xl border border-gray-700 bg-gray-900/80 transition-all">
-                    <div class="flex justify-between items-start">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-black border border-gray-600 flex items-center justify-center shadow-inner">
-                                <div class="w-7 h-7 rounded-full bg-stone-900"></div>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-sm" id="name-black">흑돌 (대기)</h3>
-                                <p class="text-[10px] text-gray-500 uppercase">Black Player</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-xl font-mono font-bold" id="timer-black">10:00</div>
-                            <div class="text-[10px] text-gray-400">사석: <span id="caps-black">0</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="card-white" class="p-4 rounded-xl border border-gray-700 bg-gray-900/80 transition-all">
-                    <div class="flex justify-between items-start">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full bg-white border border-gray-300 flex items-center justify-center shadow-lg">
-                                <div class="w-7 h-7 rounded-full bg-white"></div>
-                            </div>
-                            <div>
-                                <h3 class="font-bold text-sm" id="name-white">백돌 (대기)</h3>
-                                <p class="text-[10px] text-gray-500 uppercase">White Player (덤 6.5)</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-xl font-mono font-bold" id="timer-white">10:00</div>
-                            <div class="text-[10px] text-gray-400">사석: <span id="caps-white">0</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. 대국 컨트롤 버튼 -->
-            <div class="section-card grid grid-cols-2 gap-2">
-                <button id="btn-pass" class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg text-sm font-medium transition-colors border border-white/5">
-                    <i data-lucide="skip-forward" class="w-4 h-4"></i> 한수쉼
-                </button>
-                <button id="btn-resign" class="flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 py-3 rounded-lg text-sm font-medium transition-colors border border-red-500/20">
-                    <i data-lucide="flag" class="w-4 h-4"></i> 기권
-                </button>
-                <button id="btn-undo" class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg text-sm font-medium transition-colors border border-white/5">
-                    <i data-lucide="undo-2" class="w-4 h-4"></i> 무르기
-                </button>
-                <button id="btn-counting" class="flex items-center justify-center gap-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-400 py-3 rounded-lg text-sm font-medium transition-colors border border-blue-500/20">
-                    <i data-lucide="calculator" class="w-4 h-4"></i> 형세판단
-                </button>
-            </div>
-
-            <!-- 4. 실시간 대국 로그 -->
-            <div class="section-card flex flex-col h-[280px]">
-                <div class="flex items-center justify-between mb-3">
-                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                        <i data-lucide="history" class="w-3 h-3"></i> 대국 기록
-                    </h4>
-                    <button id="btn-download-sgf" class="text-[10px] text-blue-400 hover:underline font-bold">SGF 저장</button>
-                </div>
-                <div id="game-logs" class="scroll-box custom-scroll bg-black/30 rounded-lg p-3 font-mono space-y-1">
-                    <div class="text-blue-500">[SYSTEM] 시스템이 준비되었습니다.</div>
-                </div>
-            </div>
-
-            <!-- 5. 채팅 인터페이스 -->
-            <div class="section-card flex flex-col h-[320px]">
-                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                    <i data-lucide="message-circle" class="w-3 h-3"></i> 실시간 채팅
-                </h4>
-                <div id="chat-messages" class="scroll-box custom-scroll bg-black/30 rounded-lg p-3 mb-3 space-y-3">
-                    <!-- 메시지 동적 추가 -->
-                </div>
-                <form id="chat-form" class="flex gap-2">
-                    <input type="text" id="chat-input" placeholder="메시지 입력..." 
-                        class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 transition-all">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg">
-                        <i data-lucide="send" class="w-4 h-4"></i>
+                <div class="flex items-center gap-3">
+                    <button id="btn-settings" class="p-3 bg-slate-900/80 hover:bg-slate-800 rounded-xl border border-slate-700 transition-all">
+                        <i data-lucide="settings" class="w-5 h-5 text-slate-400"></i>
                     </button>
-                </form>
-            </div>
-
-            <!-- 6. 대국 복기 컨트롤 -->
-            <div class="section-card">
-                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <i data-lucide="rewind" class="w-3 h-3"></i> 기보 복기
-                </h4>
-                <div class="flex items-center justify-between gap-2">
-                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-first"><i data-lucide="chevrons-left"></i></button>
-                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-prev"><i data-lucide="chevron-left"></i></button>
-                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-next"><i data-lucide="chevron-right"></i></button>
-                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-last"><i data-lucide="chevrons-right"></i></button>
+                    <button id="btn-fullscreen" class="p-3 bg-slate-900/80 hover:bg-slate-800 rounded-xl border border-slate-700 transition-all">
+                        <i data-lucide="maximize" class="w-5 h-5 text-slate-400"></i>
+                    </button>
                 </div>
             </div>
 
-            <!-- Footer: 도움말 및 버전 -->
-            <div class="p-8 text-center text-gray-600">
-                <p class="text-[10px] font-medium tracking-widest uppercase mb-1">Peer Baduk Engine v1.5.0</p>
-                <p class="text-[9px]">© 2026 Professional P2P Baduk Network. All rights reserved.</p>
+            <!-- 바둑판 엔진 본체 -->
+            <div id="board-engine" class="board-wrapper">
+                <!-- 레이어 구조 -->
+                <div id="layer-grid" class="absolute inset-0 pointer-events-none"></div>
+                <div id="layer-stones" class="absolute inset-0 pointer-events-none"></div>
+                <div id="layer-intersections" class="absolute inset-0"></div>
+                <!-- 고스트 돌 -->
+                <div id="ghost" class="ghost-stone"></div>
+            </div>
+
+            <!-- 하단 툴팁 -->
+            <div class="mt-8 flex gap-8">
+                <div class="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <kbd class="bg-slate-800 px-2 py-1 rounded border border-slate-700 text-slate-300">Space</kbd> Pass Turn
+                </div>
+                <div class="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <kbd class="bg-slate-800 px-2 py-1 rounded border border-slate-700 text-slate-300">U</kbd> Undo Request
+                </div>
+                <div class="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    <kbd class="bg-slate-800 px-2 py-1 rounded border border-slate-700 text-slate-300">Enter</kbd> Send Chat
+                </div>
             </div>
         </section>
+
+        <!-- 오른쪽: 컨트롤 및 정보 패널 -->
+        <aside class="sidebar">
+            
+            <!-- 1. 커넥션 컨트롤러 -->
+            <div class="p-6 bg-slate-950/50 border-b border-white/5">
+                <div class="flex items-center justify-between mb-6">
+                    <h1 class="text-xl font-black tracking-tighter italic flex items-center gap-2">
+                        <span class="text-blue-500">MASTER</span> BADUK <span class="text-[10px] not-italic font-bold text-slate-600 ml-2">v2.5</span>
+                    </h1>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="p-4 bg-slate-900 rounded-2xl border border-white/5">
+                        <label class="text-[9px] font-black text-slate-500 uppercase block mb-1">My Connection ID</label>
+                        <div id="display-my-id" class="text-2xl font-mono font-black text-white tracking-widest italic">----</div>
+                    </div>
+                    <div class="p-4 bg-slate-900 rounded-2xl border border-white/5 focus-within:border-blue-500 transition-colors">
+                        <label class="text-[9px] font-black text-slate-500 uppercase block mb-1">Target Peer ID</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="input-target-id" maxlength="4" placeholder="0000" 
+                                class="w-full bg-transparent border-none outline-none text-xl font-mono font-bold text-blue-400 placeholder:opacity-20">
+                            <button id="btn-connect" class="p-1 text-blue-500 hover:scale-110 transition-transform">
+                                <i data-lucide="arrow-right-circle" class="w-6 h-6"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <button id="btn-copy-id" class="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                    <i data-lucide="copy" class="w-4 h-4"></i> 접속 ID 복사하기
+                </button>
+            </div>
+
+            <!-- 2. 대국자 상태 카드 -->
+            <div class="flex-1 overflow-y-auto custom-scroll px-4 pt-6 space-y-4">
+                
+                <!-- 흑돌 대국자 -->
+                <div id="card-black" class="player-card rounded-3xl p-6 relative overflow-hidden bg-slate-900/40">
+                    <div class="flex justify-between items-center relative z-10">
+                        <div class="flex items-center gap-5">
+                            <div class="relative">
+                                <div class="w-14 h-14 rounded-full bg-black border-2 border-slate-700 shadow-2xl flex items-center justify-center">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-neutral-600 to-black"></div>
+                                </div>
+                                <div id="indicator-black" class="hidden absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full border-4 border-slate-900 animate-pulse"></div>
+                            </div>
+                            <div>
+                                <h3 class="font-black text-sm text-white" id="name-black">흑돌 대국자</h3>
+                                <div class="flex gap-4 mt-2">
+                                    <div class="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                                        <i data-lucide="target" class="w-3 h-3"></i> 따낸 돌: <span id="caps-black" class="text-white font-mono">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div id="timer-black" class="text-3xl font-mono font-black text-white tracking-tighter">10:00</div>
+                            <div class="text-[9px] font-black text-slate-600 uppercase">남은 시간</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 백돌 대국자 -->
+                <div id="card-white" class="player-card rounded-3xl p-6 relative overflow-hidden bg-slate-900/40">
+                    <div class="flex justify-between items-center relative z-10">
+                        <div class="flex items-center gap-5">
+                            <div class="relative">
+                                <div class="w-14 h-14 rounded-full bg-white border-2 border-slate-300 shadow-xl flex items-center justify-center">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-white to-neutral-200"></div>
+                                </div>
+                                <div id="indicator-white" class="hidden absolute -top-1 -right-1 w-5 h-5 bg-blue-500 rounded-full border-4 border-slate-900 animate-pulse"></div>
+                            </div>
+                            <div>
+                                <h3 class="font-black text-sm text-white" id="name-white">백돌 대국자</h3>
+                                <div class="flex gap-4 mt-2">
+                                    <div class="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5">
+                                        <i data-lucide="target" class="w-3 h-3"></i> 따낸 돌: <span id="caps-white" class="text-white font-mono">0</span>
+                                    </div>
+                                    <div class="text-[10px] font-bold text-blue-500 uppercase">덤: 6.5</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div id="timer-white" class="text-3xl font-mono font-black text-white tracking-tighter">10:00</div>
+                            <div class="text-[9px] font-black text-slate-600 uppercase">남은 시간</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 대국 컨트롤 버튼 -->
+                <div class="grid grid-cols-2 gap-3 pt-4">
+                    <button id="btn-pass" class="flex flex-col items-center justify-center gap-2 py-6 bg-slate-800/40 hover:bg-slate-800 rounded-3xl border border-white/5 transition-all group">
+                        <i data-lucide="fast-forward" class="w-6 h-6 text-slate-500 group-hover:text-white"></i>
+                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-300">한수쉼 (PASS)</span>
+                    </button>
+                    <button id="btn-undo" class="flex flex-col items-center justify-center gap-2 py-6 bg-slate-800/40 hover:bg-slate-800 rounded-3xl border border-white/5 transition-all group">
+                        <i data-lucide="rotate-ccw" class="w-6 h-6 text-slate-500 group-hover:text-white"></i>
+                        <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover:text-slate-300">무르기 요청</span>
+                    </button>
+                    <button id="btn-resign" class="col-span-2 py-5 bg-red-600/10 hover:bg-red-600 border border-red-500/20 hover:border-red-500 rounded-3xl transition-all group mt-2">
+                        <span class="text-xs font-black text-red-500 group-hover:text-white uppercase tracking-widest flex items-center justify-center gap-2">
+                            <i data-lucide="flag" class="w-4 h-4"></i> 기권하기 (RESIGN)
+                        </span>
+                    </button>
+                </div>
+
+                <!-- 4. 실시간 로그 & 기록 -->
+                <div class="pt-6">
+                    <div class="flex items-center justify-between px-2 mb-3">
+                        <span class="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">Game Protocol History</span>
+                        <div class="h-px flex-1 bg-slate-800 mx-4"></div>
+                        <i data-lucide="scroll-text" class="w-3 h-3 text-slate-600"></i>
+                    </div>
+                    <div id="protocol-log" class="h-48 bg-slate-950/50 rounded-2xl p-4 overflow-y-auto font-mono text-[11px] space-y-2 border border-white/5 custom-scroll">
+                        <div class="text-slate-500 italic opacity-50">Initializing game log...</div>
+                    </div>
+                </div>
+
+                <!-- 5. 실시간 채팅 -->
+                <div class="pt-6 pb-10 flex flex-col h-[400px]">
+                    <div class="flex items-center justify-between px-2 mb-3">
+                        <span class="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">Live Match Chat</span>
+                        <div class="h-px flex-1 bg-slate-800 mx-4"></div>
+                        <i data-lucide="messages-square" class="w-3 h-3 text-slate-600"></i>
+                    </div>
+                    <div id="chat-display" class="flex-1 bg-slate-950/50 rounded-2xl p-4 overflow-y-auto mb-3 border border-white/5 custom-scroll space-y-4">
+                        <div class="text-center text-[9px] text-slate-700 py-4 uppercase font-bold tracking-[0.3em]">End-to-End P2P Encryption Active</div>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." 
+                            class="w-full bg-slate-900/80 border border-slate-800 rounded-2xl px-5 py-4 text-xs font-medium outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-700 pr-14">
+                        <button id="btn-send-chat" class="absolute right-2 top-2 bottom-2 w-10 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-600/20 active:scale-95">
+                            <i data-lucide="send" class="w-4 h-4 text-white"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 
-    <!-- 결과 안내 모달 -->
-    <div id="result-modal" class="hidden fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm items-center justify-center p-6">
-        <div class="bg-gray-900 border-2 border-blue-500/30 w-full max-w-md rounded-3xl p-8 text-center shadow-[0_0_50px_rgba(59,130,246,0.2)]">
-            <div class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/50">
-                <i data-lucide="trophy" class="w-10 h-10 text-white"></i>
+    <!-- 로딩/페어링 오버레이 -->
+    <div id="overlay-loading" class="hidden fixed inset-0 z-[200] modal-bg flex items-center justify-center flex-col gap-6">
+        <span class="loader"></span>
+        <div class="text-center">
+            <h2 id="loading-title" class="text-2xl font-black italic text-white mb-1">상대방을 찾는 중...</h2>
+            <p id="loading-sub" class="text-slate-500 text-sm font-medium">네트워크 연결을 최적화하고 있습니다.</p>
+        </div>
+        <button onclick="hideOverlay()" class="mt-8 px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold rounded-full transition-all">취소</button>
+    </div>
+
+    <!-- 결과 발표 모달 -->
+    <div id="modal-result" class="hidden fixed inset-0 z-[300] modal-bg flex items-center justify-center p-8">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-[48px] p-12 text-center shadow-[0_0_100px_rgba(0,0,0,0.8)]">
+            <div class="inline-flex p-6 bg-blue-600 rounded-[32px] shadow-2xl shadow-blue-600/20 mb-10">
+                <i data-lucide="trophy" class="w-16 h-16 text-white"></i>
             </div>
-            <h2 id="modal-title" class="text-3xl font-bold mb-2">대국 종료</h2>
-            <p id="modal-desc" class="text-gray-400 mb-8 font-medium">결과를 계산하였습니다.</p>
+            <h2 id="result-winner" class="text-5xl font-black text-white italic tracking-tighter mb-4">BLACK WINS!</h2>
+            <p id="result-detail" class="text-slate-400 font-semibold text-lg mb-10 uppercase tracking-widest">15.5 Point Difference</p>
             
-            <div class="grid grid-cols-2 gap-4 mb-8">
-                <div class="bg-black/40 p-5 rounded-2xl border border-white/5">
-                    <p class="text-[10px] text-gray-500 uppercase mb-1 font-bold">Black Score</p>
-                    <span id="final-b" class="text-2xl font-mono font-black text-white">0.0</span>
+            <div class="grid grid-cols-2 gap-8 mb-12">
+                <div class="p-8 rounded-[40px] bg-black/40 border border-slate-800 shadow-inner">
+                    <div class="text-[11px] font-black text-slate-600 uppercase mb-3">Black Total</div>
+                    <div id="final-black" class="text-4xl font-mono font-black text-white">0.0</div>
                 </div>
-                <div class="bg-black/40 p-5 rounded-2xl border border-white/5">
-                    <p class="text-[10px] text-gray-500 uppercase mb-1 font-bold">White Score</p>
-                    <span id="final-w" class="text-2xl font-mono font-black text-blue-400">6.5</span>
+                <div class="p-8 rounded-[40px] bg-black/40 border border-slate-800 shadow-inner">
+                    <div class="text-[11px] font-black text-slate-600 uppercase mb-3">White Total</div>
+                    <div id="final-white" class="text-4xl font-mono font-black text-blue-500">6.5</div>
                 </div>
             </div>
-            
-            <button onclick="closeModal()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-bold transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-600/30">
-                대국실로 돌아가기
+
+            <button onclick="location.reload()" class="w-full py-6 bg-white hover:bg-slate-200 text-black rounded-[32px] font-black text-xl transition-all shadow-2xl active:scale-[0.97]">
+                새로운 대국 시작하기
             </button>
         </div>
     </div>
 
-    <!-- 알림 오버레이 (무르기 요청 등) -->
-    <div id="alert-overlay" class="hidden fixed bottom-10 left-10 z-[200] bg-gray-900 border border-blue-500 p-4 rounded-xl shadow-2xl flex items-center gap-4 animate-bounce">
-        <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center"><i data-lucide="bell" class="text-white"></i></div>
-        <div>
-            <p id="alert-msg" class="text-sm font-bold">상대방이 무르기를 요청했습니다.</p>
-            <div class="flex gap-2 mt-2">
-                <button id="alert-yes" class="px-3 py-1 bg-blue-600 rounded text-xs font-bold">수락</button>
-                <button id="alert-no" class="px-3 py-1 bg-gray-700 rounded text-xs font-bold">거절</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // --- 엔진 및 상수 설정 ---
-        const SIZE = 19;
-        const GRID_PCT = 100 / (SIZE + 1);
-        const PADDING_PCT = GRID_PCT;
-        const KOMI = 6.5;
+        /**
+         * MASTER BADUK P2P ENGINE v2.5
+         * 모든 핵심 규칙(자충, 패, 계가) 및 안정적 연결 시스템 포함
+         */
 
-        // --- 전역 게임 상태 ---
-        let state = {
-            board: Array(SIZE).fill().map(() => Array(SIZE).fill(0)), // 0: 빈칸, 1: 흑, 2: 백
-            history: [], // [{type, x, y, color, caps: []}, ...]
-            turn: 1, // 1: 흑, 2: 백
-            myColor: null, 
-            caps: { 1: 0, 2: 0 },
-            ko: null, // 패(Ko) 위치 {x, y}
-            isGameOver: false,
+        // --- 전역 설정 및 상수 ---
+        const SIZE = 19;
+        const KOMI = 6.5;
+        const APP_ID = "MASTER_BADUK_PRO_";
+        const STUN_SERVERS = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun.anyfirewall.com:3478' }
+        ];
+
+        // --- 엔진 상태 관리 ---
+        const Game = {
+            board: Array(SIZE).fill().map(() => Array(SIZE).fill(0)), // 0:Empty, 1:Black, 2:White
+            turn: 1, // 흑부터 시작
+            myColor: null,
+            history: [],
+            captures: { 1: 0, 2: 0 },
+            koPoint: null, // 패(Ko)가 발생한 좌표 {x, y}
+            gameOver: false,
             timers: { 1: 600, 2: 600 },
-            timerIdx: null,
-            replayIdx: -1
+            timerInstance: null,
+            passCount: 0,
+            
+            // 초기화
+            reset() {
+                this.board = Array(SIZE).fill().map(() => Array(SIZE).fill(0));
+                this.turn = 1;
+                this.history = [];
+                this.captures = { 1: 0, 2: 0 };
+                this.koPoint = null;
+                this.gameOver = false;
+                this.passCount = 0;
+            }
         };
 
-        // --- PeerJS 통신 로직 ---
+        // --- 네트워크 상태 관리 ---
         let peer = null;
         let conn = null;
-        const appId = "baduk-pro-";
 
-        function initNetwork() {
-            const shortId = Math.floor(1000 + Math.random() * 9000).toString();
-            peer = new Peer(appId + shortId);
+        // --- 소리 재생용 (Web Audio) ---
+        const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playStoneSound() {
+            const osc = AudioCtx.createOscillator();
+            const gain = AudioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(AudioCtx.destination);
+            osc.frequency.setValueAtTime(150, AudioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, AudioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, AudioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, AudioCtx.currentTime + 0.1);
+            osc.start();
+            osc.stop(AudioCtx.currentTime + 0.1);
+        }
+
+        // --- P2P 연결 로직 ---
+        function initP2P() {
+            const id = Math.floor(1000 + Math.random() * 9000).toString();
+            peer = new Peer(APP_ID + id, { 
+                config: { 'iceServers': STUN_SERVERS },
+                debug: 1 
+            });
 
             peer.on('open', (id) => {
-                document.getElementById('my-peer-id').textContent = shortId;
-                addLog(`네트워크 준비 완료. 코드: ${shortId}`, "system");
+                const shortId = id.replace(APP_ID, "");
+                document.getElementById('display-my-id').textContent = shortId;
+                logToProtocol(`SYSTEM: Peer Engine initialized. ID: ${shortId}`, 'sys');
             });
 
             peer.on('connection', (c) => {
-                if (conn) { c.close(); return; }
+                if (conn) {
+                    c.on('open', () => {
+                        c.send({ type: 'REJECT', msg: 'Already in a match.' });
+                        setTimeout(() => c.close(), 500);
+                    });
+                    return;
+                }
                 conn = c;
-                state.myColor = 1; // 먼저 접속 코드를 연 사람이 흑돌(호스트)
-                bindConnEvents();
-                addLog("상대방이 입장했습니다. 당신은 흑돌입니다.", "system");
-                startGame();
+                Game.myColor = 1; // 먼저 기다린 사람(Host)이 흑
+                bindPeerEvents();
+                showOverlay("상대방이 입장했습니다!", "대국을 시작합니다.");
+                setTimeout(hideOverlay, 1500);
             });
 
             peer.on('error', (err) => {
-                addLog(`연결 오류: ${err.type}`, "error");
+                console.error("Peer Error:", err);
+                logToProtocol(`ERROR: ${err.type} - 연결을 다시 시도해주세요.`, 'error');
+                hideOverlay();
             });
         }
 
-        function bindConnEvents() {
+        function bindPeerEvents() {
             conn.on('open', () => {
-                document.getElementById('conn-status').textContent = "온라인";
-                document.getElementById('conn-dot').classList.replace('bg-blue-500', 'bg-green-500');
-                if (!state.myColor) {
-                    state.myColor = 2; // 초대받은 사람이 백돌
-                    addLog("대국실에 접속했습니다. 당신은 백돌입니다.", "system");
-                    startGame();
+                document.getElementById('p2p-status-text').textContent = "Online - Connected";
+                document.getElementById('p2p-status-dot').className = "w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_10px_#22c55e]";
+                
+                if (!Game.myColor) {
+                    Game.myColor = 2; // 연결을 건 사람이 백
                 }
+                
+                logToProtocol(`MATCH: Connected. You are ${Game.myColor === 1 ? 'BLACK' : 'WHITE'}.`, 'sys');
+                startMatch();
             });
 
             conn.on('data', (data) => {
-                handleNetworkData(data);
+                switch(data.type) {
+                    case 'MOVE': handleRemoteMove(data.x, data.y); break;
+                    case 'PASS': handleRemotePass(); break;
+                    case 'CHAT': pushChat(data.msg, false); break;
+                    case 'UNDO_REQ': confirmUndo(); break;
+                    case 'UNDO_ACCEPT': performUndo(); break;
+                    case 'RESIGN': handleResign(false); break;
+                    case 'REJECT': alert(data.msg); conn = null; break;
+                }
             });
 
             conn.on('close', () => {
-                document.getElementById('conn-status').textContent = "연결 끊김";
-                document.getElementById('conn-dot').classList.replace('bg-green-500', 'bg-red-500');
-                addLog("상대방과의 연결이 종료되었습니다.", "error");
+                document.getElementById('p2p-status-text').textContent = "Peer Disconnected";
+                document.getElementById('p2p-status-dot').className = "w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444]";
+                logToProtocol("SYSTEM: Connection lost.", 'error');
+                conn = null;
             });
         }
 
-        function handleNetworkData(data) {
-            switch(data.type) {
-                case 'MOVE': playStone(data.x, data.y, false); break;
-                case 'PASS': passTurn(false); break;
-                case 'CHAT': receiveChat(data.msg, data.sender); break;
-                case 'RESIGN': finalizeGame('RESIGN', data.winner); break;
-                case 'UNDO_REQ': showAlert("상대방이 무르기를 요청했습니다.", () => {
-                    undoMove();
-                    sendData({type: 'UNDO_OK'});
-                }, () => sendData({type: 'UNDO_NO'})); break;
-                case 'UNDO_OK': undoMove(); addLog("무르기 요청이 수락되었습니다.", "system"); break;
-                case 'COUNT_REQ': showAlert("상대방이 형세판단을 요청했습니다.", () => {
-                    calculateScore();
-                    sendData({type: 'COUNT_OK'});
-                }); break;
-                case 'COUNT_OK': calculateScore(); break;
-            }
-        }
-
-        function sendData(data) {
-            if (conn && conn.open) conn.send(data);
-        }
-
-        // --- 바둑 판 생성 로직 ---
+        // --- 바둑판 UI 생성 ---
         function createBoardUI() {
-            const board = document.getElementById('baduk-board');
-            board.innerHTML = '';
+            const grid = document.getElementById('layer-grid');
+            const hits = document.getElementById('layer-intersections');
+            const unit = 100 / SIZE;
 
-            // 그리드 선 그리기
+            // 1. 선 그리기
             for (let i = 0; i < SIZE; i++) {
-                const pos = PADDING_PCT + (i * GRID_PCT);
+                const pos = (unit / 2) + (i * unit);
+                
+                // 가로선
                 const h = document.createElement('div');
-                h.className = 'line-h';
+                h.className = 'grid-line line-h';
                 h.style.top = `${pos}%`;
-                board.appendChild(h);
+                grid.appendChild(h);
 
+                // 세로선
                 const v = document.createElement('div');
-                v.className = 'line-v';
+                v.className = 'grid-line line-v';
                 v.style.left = `${pos}%`;
-                board.appendChild(v);
+                grid.appendChild(v);
             }
 
-            // 화점(Star Points)
+            // 2. 화점 그리기
             const stars = [3, 9, 15];
             stars.forEach(r => {
                 stars.forEach(c => {
-                    const dot = document.createElement('div');
-                    dot.className = 'star-point';
-                    dot.style.top = `${PADDING_PCT + (r * GRID_PCT)}%`;
-                    dot.style.left = `${PADDING_PCT + (c * GRID_PCT)}%`;
-                    board.appendChild(dot);
+                    const h = document.createElement('div');
+                    h.className = 'hoshi';
+                    h.style.top = `${(unit/2) + (r * unit)}%`;
+                    h.style.left = `${(unit/2) + (c * unit)}%`;
+                    grid.appendChild(h);
                 });
             });
 
-            // 클릭 감지용 교차점 레이어
+            // 3. 클릭 감지 레이어 (19x19)
             for (let y = 0; y < SIZE; y++) {
                 for (let x = 0; x < SIZE; x++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'intersection';
-                    cell.style.top = `${PADDING_PCT + (y * GRID_PCT)}%`;
-                    cell.style.left = `${PADDING_PCT + (x * GRID_PCT)}%`;
-                    cell.dataset.x = x;
-                    cell.dataset.y = y;
+                    const hit = document.createElement('div');
+                    hit.className = 'intersection-hit';
+                    hit.style.width = `${unit}%`;
+                    hit.style.height = `${unit}%`;
+                    hit.style.left = `${x * unit}%`;
+                    hit.style.top = `${y * unit}%`;
 
-                    cell.onclick = () => onBoardClick(x, y);
-                    cell.onmouseenter = () => showGhost(x, y);
-                    cell.onmouseleave = () => hideGhost();
+                    hit.onmouseenter = () => updateGhost(x, y);
+                    hit.onmouseleave = () => { document.getElementById('ghost').style.display = 'none'; };
+                    hit.onclick = () => tryPlaceStone(x, y);
 
-                    board.appendChild(cell);
+                    hits.appendChild(hit);
                 }
             }
-        }
 
-        // --- 핵심 바둑 로직 알고리즘 ---
-        function onBoardClick(x, y) {
-            if (state.isGameOver || state.turn !== state.myColor) return;
-            if (state.board[y][x] !== 0) return;
-
-            if (isValidMove(x, y, state.turn)) {
-                playStone(x, y, true);
-                sendData({type: 'MOVE', x, y});
-            } else {
-                addLog("그곳에는 둘 수 없습니다. (착수 금지 또는 패)", "error");
+            // 4. 좌표 레이블
+            const letters = "ABCDEFGHJKLMNOPQRST";
+            const wrapper = document.getElementById('board-engine');
+            for(let i=0; i<SIZE; i++) {
+                // Top
+                const t = document.createElement('div');
+                t.className = 'coord-label';
+                t.textContent = letters[i];
+                t.style.top = "-25px";
+                t.style.left = `${(i * unit) + (unit/2)}%`;
+                t.style.transform = "translateX(-50%)";
+                wrapper.appendChild(t);
+                // Left
+                const l = document.createElement('div');
+                l.className = 'coord-label';
+                l.textContent = 19 - i;
+                l.style.left = "-25px";
+                l.style.top = `${(i * unit) + (unit/2)}%`;
+                l.style.transform = "translateY(-50%)";
+                wrapper.appendChild(l);
             }
         }
 
-        function isValidMove(x, y, color) {
+        // --- 착수 및 규칙 엔진 ---
+        function updateGhost(x, y) {
+            if (Game.gameOver || Game.turn !== Game.myColor || Game.board[y][x] !== 0) return;
+            const ghost = document.getElementById('ghost');
+            const unit = 100 / SIZE;
+            ghost.className = `ghost-stone ${Game.myColor === 1 ? 'black' : 'white'}`;
+            ghost.style.left = `${(x * unit) + (unit/2)}%`;
+            ghost.style.top = `${(y * unit) + (unit/2)}%`;
+            ghost.style.display = 'block';
+        }
+
+        function tryPlaceStone(x, y) {
+            if (Game.gameOver || Game.turn !== Game.myColor) return;
+            if (Game.board[y][x] !== 0) return;
+
             // 1. 패(Ko) 체크
-            if (state.ko && state.ko.x === x && state.ko.y === y) return false;
+            if (Game.koPoint && Game.koPoint.x === x && Game.koPoint.y === y) {
+                logToProtocol("ILLEGAL: 패(Ko)를 바로 따낼 수 없습니다.", "error");
+                return;
+            }
 
-            // 2. 가상 착수 후 사석 체크
-            const tempBoard = JSON.parse(JSON.stringify(state.board));
-            tempBoard[y][x] = color;
-
-            const opponent = color === 1 ? 2 : 1;
-            const captured = getCapturedStones(x, y, opponent, tempBoard);
-
-            // 상대 돌을 따낼 수 있다면 자충수가 아님
-            if (captured.length > 0) return true;
-
-            // 상대 돌을 못 따낸다면, 내 그룹의 활로가 있어야 함
-            return hasLiberties(x, y, color, tempBoard);
-        }
-
-        function hasLiberties(x, y, color, board) {
-            const group = getGroup(x, y, color, board);
-            const liberties = new Set();
+            // 2. 가상 착수 시뮬레이션 (자충 및 사석 체크)
+            const simulatedBoard = JSON.parse(JSON.stringify(Game.board));
+            simulatedBoard[y][x] = Game.turn;
             
-            group.forEach(p => {
-                const neighbors = [[p.x+1, p.y], [p.x-1, p.y], [p.x, p.y+1], [p.x, p.y-1]];
-                neighbors.forEach(([nx, ny]) => {
-                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
-                        if (board[ny][nx] === 0) liberties.add(`${nx},${ny}`);
-                    }
-                });
-            });
-            return liberties.size > 0;
+            const opponent = Game.turn === 1 ? 2 : 1;
+            const caps = findCapturedGroups(x, y, opponent, simulatedBoard);
+            
+            // 만약 따낼 수 있는 돌이 있다면 자충수 여부와 상관없이 허용됨
+            if (caps.length === 0) {
+                if (!hasLiberties(x, y, Game.turn, simulatedBoard)) {
+                    logToProtocol("ILLEGAL: 자충수입니다.", "error");
+                    return;
+                }
+            }
+
+            // 3. 실제 착수 진행
+            applyMove(x, y, Game.turn, caps);
+            if (conn) conn.send({ type: 'MOVE', x, y });
         }
 
-        function getGroup(x, y, color, board) {
-            const group = [];
-            const visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
-            const queue = [{x, y}];
-            visited[y][x] = true;
+        function handleRemoteMove(x, y) {
+            const opponent = Game.myColor === 1 ? 2 : 1;
+            const caps = findCapturedGroups(x, y, Game.myColor, Game.board);
+            applyMove(x, y, opponent, caps);
+        }
 
-            while (queue.length > 0) {
+        function applyMove(x, y, color, caps) {
+            playStoneSound();
+            Game.board[y][x] = color;
+            Game.passCount = 0;
+
+            // 사석 제거 및 점수 합산
+            caps.forEach(p => {
+                Game.board[p.y][p.x] = 0;
+                Game.captures[color]++;
+            });
+
+            // 패(Ko) 포인트 갱신: 한 점만 따내고 내 돌도 고립된 경우
+            let newKo = null;
+            if (caps.length === 1) {
+                const group = getGroup(x, y, color, Game.board);
+                if (group.length === 1 && !checkLiberties(group, Game.board)) {
+                    newKo = { x: caps[0].x, y: caps[0].y };
+                }
+            }
+            
+            // 히스토리 기록
+            Game.history.push({
+                type: 'MOVE', x, y, color,
+                caps: caps,
+                prevKo: Game.koPoint
+            });
+            
+            Game.koPoint = newKo;
+            renderStones();
+            switchTurn();
+            
+            const pos = String.fromCharCode(65 + (x >= 8 ? x+1 : x)) + (19 - y);
+            logToProtocol(`${color === 1 ? 'Black' : 'White'} placed at ${pos}`, color === 1 ? 'black' : 'white');
+        }
+
+        // --- 보조 규칙 함수들 ---
+        function findCapturedGroups(lx, ly, targetColor, board) {
+            const allCaps = [];
+            const neighbors = [[1,0], [-1,0], [0,1], [0,-1]];
+            
+            neighbors.forEach(([dx, dy]) => {
+                const nx = lx + dx, ny = ly + dy;
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[ny][nx] === targetColor) {
+                    const group = getGroup(nx, ny, targetColor, board);
+                    if (!checkLiberties(group, board)) {
+                        group.forEach(p => {
+                            if (!allCaps.some(existing => existing.x === p.x && existing.y === p.y)) {
+                                allCaps.push(p);
+                            }
+                        });
+                    }
+                }
+            });
+            return allCaps;
+        }
+
+        function getGroup(sx, sy, color, board) {
+            const group = [];
+            const queue = [{x: sx, y: sy}];
+            const visited = new Set();
+            visited.add(`${sx},${sy}`);
+
+            while(queue.length > 0) {
                 const curr = queue.shift();
                 group.push(curr);
 
-                const neighbors = [[curr.x+1, curr.y], [curr.x-1, curr.y], [curr.x, curr.y+1], [curr.x, curr.y-1]];
-                neighbors.forEach(([nx, ny]) => {
-                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
-                        if (!visited[ny][nx] && board[ny][nx] === color) {
-                            visited[ny][nx] = true;
-                            queue.push({x: nx, y: ny});
-                        }
+                [[1,0], [-1,0], [0,1], [0,-1]].forEach(([dx, dy]) => {
+                    const nx = curr.x + dx, ny = curr.y + dy;
+                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && 
+                        board[ny][nx] === color && !visited.has(`${nx},${ny}`)) {
+                        visited.add(`${nx},${ny}`);
+                        queue.push({x: nx, y: ny});
                     }
                 });
             }
             return group;
         }
 
-        function getCapturedStones(lastX, lastY, opponentColor, board) {
-            let allCaptured = [];
-            const neighbors = [[lastX+1, lastY], [lastX-1, lastY], [lastX, lastY+1], [lastX, lastY-1]];
-
-            neighbors.forEach(([nx, ny]) => {
-                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[ny][nx] === opponentColor) {
-                    const group = getGroup(nx, ny, opponentColor, board);
-                    // 활로 체크
-                    let groupLiberties = 0;
-                    group.forEach(p => {
-                        const subNeighbors = [[p.x+1, p.y], [p.x-1, p.y], [p.x, p.y+1], [p.x, p.y-1]];
-                        subNeighbors.forEach(([snx, sny]) => {
-                            if (snx >= 0 && snx < SIZE && sny >= 0 && sny < SIZE && board[sny][snx] === 0) {
-                                groupLiberties++;
-                            }
-                        });
-                    });
-
-                    if (groupLiberties === 0) {
-                        group.forEach(p => {
-                            if (!allCaptured.some(s => s.x === p.x && s.y === p.y)) allCaptured.push(p);
-                        });
-                    }
+        function checkLiberties(group, board) {
+            for (const p of group) {
+                const adj = [[1,0], [-1,0], [0,1], [0,-1]];
+                for (const [dx, dy] of adj) {
+                    const nx = p.x + dx, ny = p.y + dy;
+                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[ny][nx] === 0) return true;
                 }
-            });
-            return allCaptured;
-        }
-
-        function playStone(x, y, isMe) {
-            const color = state.turn;
-            const opponent = color === 1 ? 2 : 1;
-
-            // 보드 업데이트
-            state.board[y][x] = color;
-            const captured = getCapturedStones(x, y, opponent, state.board);
-            
-            captured.forEach(p => {
-                state.board[p.y][p.x] = 0;
-                state.caps[color]++;
-            });
-
-            // 패(Ko) 로직: 한 점 따내고 내 돌도 한 점이며 단수일 때
-            if (captured.length === 1) {
-                const myGroup = getGroup(x, y, color, state.board);
-                if (myGroup.length === 1 && !hasLiberties(x, y, color, state.board)) {
-                    // 사실 활로가 0인 상태는 따낸 직후라 불가능하므로, 실제로는 활로가 1개인 지점이 패의 대상
-                }
-                // 간략화된 패 처리: 따낸 자리를 기억
-                state.ko = {x: captured[0].x, y: captured[0].y};
-            } else {
-                state.ko = null;
             }
-
-            // 기록 저장
-            state.history.push({
-                type: 'MOVE', x, y, color, caps: captured, ko: state.ko
-            });
-            state.replayIdx = state.history.length - 1;
-
-            // UI 갱신
-            renderBoard();
-            switchTurn();
-            
-            const posStr = String.fromCharCode(65 + (x >= 8 ? x+1 : x)) + (SIZE - y);
-            addLog(`${color === 1 ? '흑' : '백'}: ${posStr} 착수`, color === 1 ? "black" : "white");
+            return false;
         }
 
-        function passTurn(isMe) {
-            const color = state.turn;
-            state.history.push({ type: 'PASS', color });
-            state.replayIdx = state.history.length - 1;
-            
-            addLog(`${color === 1 ? '흑' : '백'}: 한수쉼`, "system");
-
-            // 연속 두 번 쉬면 종료
-            const len = state.history.length;
-            if (len >= 2 && state.history[len-1].type === 'PASS' && state.history[len-2].type === 'PASS') {
-                calculateScore();
-            }
-
-            if (isMe) sendData({type: 'PASS'});
-            switchTurn();
+        function hasLiberties(x, y, color, board) {
+            return checkLiberties(getGroup(x, y, color, board), board);
         }
 
-        function switchTurn() {
-            state.turn = state.turn === 1 ? 2 : 1;
-            updateUI();
-            resetTimer();
-        }
-
-        // --- UI 렌더링 및 유틸리티 ---
-        function renderBoard() {
-            // 기존 돌 제거
-            document.querySelectorAll('.stone').forEach(s => s.remove());
-            const board = document.getElementById('baduk-board');
+        // --- UI 렌더링 루프 ---
+        function renderStones() {
+            const layer = document.getElementById('layer-stones');
+            layer.innerHTML = '';
+            const unit = 100 / SIZE;
+            const last = Game.history.length > 0 ? Game.history[Game.history.length - 1] : null;
 
             for (let y = 0; y < SIZE; y++) {
                 for (let x = 0; x < SIZE; x++) {
-                    if (state.board[y][x] !== 0) {
+                    if (Game.board[y][x] !== 0) {
                         const stone = document.createElement('div');
-                        const isBlack = state.board[y][x] === 1;
-                        stone.className = `stone ${isBlack ? 'black' : 'white'} animate-drop`;
-                        stone.style.top = `${PADDING_PCT + (y * GRID_PCT)}%`;
-                        stone.style.left = `${PADDING_PCT + (x * GRID_PCT)}%`;
+                        stone.className = `stone placed ${Game.board[y][x] === 1 ? 'black' : 'white'}`;
+                        stone.style.left = `${(x * unit) + (unit/2)}%`;
+                        stone.style.top = `${(y * unit) + (unit/2)}%`;
 
-                        // 마지막 수 강조
-                        const last = state.history[state.history.length-1];
                         if (last && last.type === 'MOVE' && last.x === x && last.y === y) {
-                            stone.classList.add('last-move');
+                            const marker = document.createElement('div');
+                            marker.className = 'last-move-marker';
+                            stone.appendChild(marker);
                         }
 
-                        board.appendChild(stone);
+                        layer.appendChild(stone);
                     }
                 }
             }
-            document.getElementById('current-move-display').textContent = `${state.history.length} MOVE`;
+
+            // 스코어 보드 업데이트
+            document.getElementById('caps-black').textContent = Game.captures[1];
+            document.getElementById('caps-white').textContent = Game.captures[2];
+            document.getElementById('move-indicator').textContent = `MOVE #${String(Game.history.length).padStart(3, '0')}`;
         }
 
-        function updateUI() {
-            const bCard = document.getElementById('card-black');
-            const wCard = document.getElementById('card-white');
-            
-            if (state.turn === 1) {
-                bCard.classList.add('pulse-turn', 'border-blue-500');
-                wCard.classList.remove('pulse-turn', 'border-blue-500');
+        // --- 게임 흐름 제어 ---
+        function switchTurn() {
+            Game.turn = Game.turn === 1 ? 2 : 1;
+            updateTurnUI();
+            resetTurnTimer();
+        }
+
+        function updateTurnUI() {
+            const cB = document.getElementById('card-black');
+            const cW = document.getElementById('card-white');
+            const iB = document.getElementById('indicator-black');
+            const iW = document.getElementById('indicator-white');
+
+            if (Game.turn === 1) {
+                cB.classList.add('active'); cW.classList.remove('active');
+                iB.classList.remove('hidden'); iW.classList.add('hidden');
             } else {
-                wCard.classList.add('pulse-turn', 'border-blue-500');
-                bCard.classList.remove('pulse-turn', 'border-blue-500');
+                cW.classList.add('active'); cB.classList.remove('active');
+                iW.classList.remove('hidden'); iB.classList.add('hidden');
             }
-
-            document.getElementById('caps-black').textContent = state.caps[1];
-            document.getElementById('caps-white').textContent = state.caps[2];
         }
 
-        function showGhost(x, y) {
-            if (state.board[y][x] !== 0 || state.turn !== state.myColor) return;
-            hideGhost();
-            const ghost = document.createElement('div');
-            ghost.id = 'ghost';
-            ghost.className = `stone ${state.myColor === 1 ? 'black' : 'white'} ghost-stone`;
-            ghost.style.top = `${PADDING_PCT + (y * GRID_PCT)}%`;
-            ghost.style.left = `${PADDING_PCT + (x * GRID_PCT)}%`;
-            document.getElementById('baduk-board').appendChild(ghost);
-        }
-
-        function hideGhost() {
-            const g = document.getElementById('ghost');
-            if (g) g.remove();
-        }
-
-        function addLog(msg, type) {
-            const logs = document.getElementById('game-logs');
-            const entry = document.createElement('div');
-            entry.className = "flex gap-2 items-start";
-            
-            let colorClass = "text-gray-400";
-            if (type === 'black') colorClass = "text-white font-bold";
-            if (type === 'white') colorClass = "text-blue-300";
-            if (type === 'system') colorClass = "text-yellow-500";
-            if (type === 'error') colorClass = "text-red-500";
-
-            entry.innerHTML = `<span class="text-[9px] opacity-30 mt-1">${new Date().toLocaleTimeString()}</span><span class="${colorClass}">${msg}</span>`;
-            logs.appendChild(entry);
-            logs.scrollTop = logs.scrollHeight;
-        }
-
-        function resetTimer() {
-            clearInterval(state.timerIdx);
-            state.timerIdx = setInterval(() => {
-                if (state.isGameOver) return;
-                state.timers[state.turn]--;
+        function resetTurnTimer() {
+            clearInterval(Game.timerInstance);
+            Game.timerInstance = setInterval(() => {
+                if (Game.gameOver) return;
+                Game.timers[Game.turn]--;
                 updateTimerDisplay();
-                if (state.timers[state.turn] <= 0) finalizeGame('TIMEOUT', state.turn === 1 ? 2 : 1);
+                if (Game.timers[Game.turn] <= 0) endGame("TIMEOUT");
             }, 1000);
         }
 
         function updateTimerDisplay() {
-            const fmt = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
-            document.getElementById('timer-black').textContent = fmt(state.timers[1]);
-            document.getElementById('timer-white').textContent = fmt(state.timers[2]);
+            const fmt = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2, '0')}`;
+            document.getElementById('timer-black').textContent = fmt(Game.timers[1]);
+            document.getElementById('timer-white').textContent = fmt(Game.timers[2]);
         }
 
-        // --- 대국 종료 및 계가 ---
-        function calculateScore() {
-            // 단순 집 계산 알고리즘 (Flood Fill)
-            let bScore = state.caps[1];
-            let wScore = state.caps[2] + KOMI;
+        // --- 게임 종료 및 계가 ---
+        function endGame(reason) {
+            Game.gameOver = true;
+            clearInterval(Game.timerInstance);
+            logToProtocol(`GAME OVER: ${reason}`, 'sys');
             
+            // 정밀 영역 계산
+            const score = calculateScoring();
+            const bTotal = score.black + Game.captures[1];
+            const wTotal = score.white + Game.captures[2] + KOMI;
+
+            document.getElementById('final-black').textContent = bTotal.toFixed(1);
+            document.getElementById('final-white').textContent = wTotal.toFixed(1);
+            
+            const winLabel = bTotal > wTotal ? "BLACK WINS!" : "WHITE WINS!";
+            document.getElementById('result-winner').textContent = winLabel;
+            document.getElementById('result-detail').textContent = `${Math.abs(bTotal - wTotal).toFixed(1)} Point Difference`;
+            
+            document.getElementById('modal-result').classList.remove('hidden');
+        }
+
+        function calculateScoring() {
             const visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
-            
+            let bScore = 0;
+            let wScore = 0;
+
             for(let y=0; y<SIZE; y++) {
                 for(let x=0; x<SIZE; x++) {
-                    if (state.board[y][x] === 0 && !visited[y][x]) {
-                        const {area, borders} = floodFillArea(x, y, visited);
+                    if (Game.board[y][x] === 0 && !visited[y][x]) {
+                        const area = [];
+                        const borders = new Set();
+                        const q = [{x, y}];
+                        visited[y][x] = true;
+
+                        while(q.length > 0) {
+                            const p = q.shift();
+                            area.push(p);
+                            [[1,0], [-1,0], [0,1], [0,-1]].forEach(([dx, dy]) => {
+                                const nx = p.x+dx, ny = p.y+dy;
+                                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                                    if (Game.board[ny][nx] === 0) {
+                                        if (!visited[ny][nx]) {
+                                            visited[ny][nx] = true;
+                                            q.push({x: nx, y: ny});
+                                        }
+                                    } else {
+                                        borders.add(Game.board[ny][nx]);
+                                    }
+                                }
+                            });
+                        }
                         if (borders.size === 1) {
                             if (borders.has(1)) bScore += area.length;
-                            if (borders.has(2)) wScore += area.length;
+                            else if (borders.has(2)) wScore += area.length;
                         }
                     }
                 }
             }
-            
-            state.isGameOver = true;
-            document.getElementById('final-b').textContent = bScore.toFixed(1);
-            document.getElementById('final-w').textContent = wScore.toFixed(1);
-            document.getElementById('modal-title').textContent = bScore > wScore ? "흑 승리!" : "백 승리!";
-            document.getElementById('modal-desc').textContent = `${Math.abs(bScore - wScore).toFixed(1)}집 차이로 종료되었습니다.`;
-            document.getElementById('result-modal').classList.remove('hidden');
-            document.getElementById('result-modal').classList.add('flex');
+            return { black: bScore, white: wScore };
         }
 
-        function floodFillArea(x, y, globalVisited) {
-            const area = [];
-            const borders = new Set();
-            const queue = [{x, y}];
-            globalVisited[y][x] = true;
-
-            while(queue.length > 0) {
-                const p = queue.shift();
-                area.push(p);
-
-                [[p.x+1, p.y], [p.x-1, p.y], [p.x, p.y+1], [p.x, p.y-1]].forEach(([nx, ny]) => {
-                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
-                        if (state.board[ny][nx] === 0) {
-                            if (!globalVisited[ny][nx]) {
-                                globalVisited[ny][nx] = true;
-                                queue.push({x: nx, y: ny});
-                            }
-                        } else {
-                            borders.add(state.board[ny][nx]);
-                        }
-                    }
-                });
-            }
-            return {area, borders};
+        // --- 기타 기능 및 이벤트 ---
+        function logToProtocol(msg, type) {
+            const log = document.getElementById('protocol-log');
+            const el = document.createElement('div');
+            el.className = `p-1 border-l-2 ${type === 'black' ? 'border-white' : type === 'white' ? 'border-blue-500' : 'border-yellow-500 opacity-60'}`;
+            const now = new Date();
+            el.innerHTML = `<span class="text-slate-700 mr-2">[${now.getHours()}:${now.getMinutes()}]</span> ${msg}`;
+            log.appendChild(el);
+            log.scrollTop = log.scrollHeight;
         }
 
-        function finalizeGame(reason, winner) {
-            state.isGameOver = true;
-            clearInterval(state.timerIdx);
-            const wName = winner === 1 ? "흑" : "백";
-            let msg = reason === 'RESIGN' ? `${wName} 불계승 (상대 기권)` : `${wName} 시간승`;
-            alert(msg);
-            addLog(`대국 종료: ${msg}`, "system");
-        }
-
-        // --- 채팅 기능 ---
-        function receiveChat(msg, sender) {
-            const chatBox = document.getElementById('chat-messages');
-            const div = document.createElement('div');
-            const isMe = sender === (state.myColor === 1 ? "Black" : "White");
-            div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
-            div.innerHTML = `
-                <span class="text-[9px] text-gray-500 mb-1">${sender}</span>
-                <div class="${isMe ? 'bg-blue-600' : 'bg-gray-700'} px-3 py-2 rounded-2xl text-xs max-w-[85%] shadow-md">
+        function pushChat(msg, isMe) {
+            const display = document.getElementById('chat-display');
+            const wrap = document.createElement('div');
+            wrap.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+            wrap.innerHTML = `
+                <div class="${isMe ? 'bg-blue-600' : 'bg-slate-800'} px-4 py-2.5 rounded-2xl text-xs max-w-[85%] shadow-xl">
                     ${msg}
                 </div>
             `;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            display.appendChild(wrap);
+            display.scrollTop = display.scrollHeight;
         }
 
-        // --- 무르기 로직 ---
-        function undoMove() {
-            if (state.history.length === 0) return;
-            const last = state.history.pop();
-            if (last.type === 'MOVE') {
-                state.board[last.y][last.x] = 0;
-                last.caps.forEach(p => {
-                    const opponent = last.color === 1 ? 2 : 1;
-                    state.board[p.y][p.x] = opponent;
-                    state.caps[last.color]--;
-                });
-                state.ko = last.ko;
-            }
-            state.turn = last.color; // 무른 사람의 차례로 복구
-            state.replayIdx = state.history.length - 1;
-            renderBoard();
-            updateUI();
-            addLog(`${last.color === 1 ? '흑' : '백'} 무르기 실행`, "system");
-        }
-
-        // --- 알림 시스템 ---
-        function showAlert(msg, onYes, onNo) {
-            const overlay = document.getElementById('alert-overlay');
-            document.getElementById('alert-msg').textContent = msg;
-            overlay.classList.remove('hidden');
-            
-            document.getElementById('alert-yes').onclick = () => {
-                if (onYes) onYes();
-                overlay.classList.add('hidden');
-            };
-            document.getElementById('alert-no').onclick = () => {
-                if (onNo) onNo();
-                overlay.classList.add('hidden');
-            };
-        }
-
-        // --- 이벤트 리스너 ---
+        // 버튼 액션
         document.getElementById('btn-connect').onclick = () => {
-            const id = document.getElementById('remote-peer-id').value;
-            if (id.length === 4) {
-                conn = peer.connect(appId + id);
-                bindConnEvents();
+            const tid = document.getElementById('input-target-id').value;
+            if (tid.length === 4) {
+                showOverlay("상대방에게 연결 중...", "피어 네트워크를 탐색하고 있습니다.");
+                conn = peer.connect(APP_ID + tid, { reliable: true });
+                bindPeerEvents();
             }
         };
 
-        document.getElementById('btn-pass').onclick = () => {
-            if (state.turn === state.myColor && !state.isGameOver) passTurn(true);
+        document.getElementById('btn-copy-id').onclick = () => {
+            const id = document.getElementById('display-my-id').textContent;
+            navigator.clipboard.writeText(id).then(() => {
+                alert("접속 ID가 복사되었습니다: " + id);
+            });
         };
 
-        document.getElementById('btn-resign').onclick = () => {
-            if (confirm("정말 기권하시겠습니까?")) {
-                const winner = state.myColor === 1 ? 2 : 1;
-                finalizeGame('RESIGN', winner);
-                sendData({type: 'RESIGN', winner});
-            }
-        };
-
-        document.getElementById('btn-undo').onclick = () => {
-            if (state.history.length > 0 && !state.isGameOver) {
-                sendData({type: 'UNDO_REQ'});
-                addLog("무르기를 요청했습니다...", "system");
-            }
-        };
-
-        document.getElementById('btn-counting').onclick = () => {
-            if (!state.isGameOver) {
-                sendData({type: 'COUNT_REQ'});
-                addLog("형세판단을 요청했습니다.", "system");
-            }
-        };
-
-        document.getElementById('chat-form').onsubmit = (e) => {
-            e.preventDefault();
+        document.getElementById('btn-send-chat').onclick = () => {
             const input = document.getElementById('chat-input');
-            if (input.value.trim() && conn) {
-                const msg = input.value.trim();
-                const sender = state.myColor === 1 ? "Black" : "White";
-                receiveChat(msg, sender);
-                sendData({type: 'CHAT', msg, sender});
+            const msg = input.value.trim();
+            if (msg && conn) {
+                pushChat(msg, true);
+                conn.send({ type: 'CHAT', msg });
                 input.value = '';
             }
         };
 
-        function closeModal() {
-            document.getElementById('result-modal').classList.add('hidden');
+        document.getElementById('btn-pass').onclick = () => {
+            if (Game.turn === Game.myColor && !Game.gameOver) {
+                handleLocalPass();
+            }
+        };
+
+        function handleLocalPass() {
+            Game.passCount++;
+            Game.history.push({ type: 'PASS', color: Game.turn });
+            logToProtocol(`${Game.turn === 1 ? 'Black' : 'White'} passed.`, 'sys');
+            if (conn) conn.send({ type: 'PASS' });
+            
+            if (Game.passCount >= 2) endGame("Double Pass");
+            else switchTurn();
         }
 
-        function startGame() {
-            addLog("대국이 시작되었습니다. 착수해 주세요.", "system");
-            updateUI();
-            resetTimer();
+        function handleRemotePass() {
+            Game.passCount++;
+            Game.history.push({ type: 'PASS', color: Game.turn === 1 ? 1 : 2 });
+            logToProtocol(`${Game.turn === 1 ? 'Black' : 'White'} passed.`, 'sys');
+            if (Game.passCount >= 2) endGame("Double Pass");
+            else switchTurn();
         }
 
-        // 초기화
+        document.getElementById('btn-undo').onclick = () => {
+            if (Game.history.length > 0 && !Game.gameOver) {
+                if (conn) conn.send({ type: 'UNDO_REQ' });
+                logToProtocol("SYSTEM: 무르기 요청을 보냈습니다.", 'sys');
+            }
+        };
+
+        function confirmUndo() {
+            if (confirm("상대방이 무르기를 요청했습니다. 수락하시겠습니까?")) {
+                performUndo();
+                if (conn) conn.send({ type: 'UNDO_ACCEPT' });
+            }
+        }
+
+        function performUndo() {
+            if (Game.history.length === 0) return;
+            const last = Game.history.pop();
+            if (last.type === 'MOVE') {
+                Game.board[last.y][last.x] = 0;
+                last.caps.forEach(p => {
+                    const opp = last.color === 1 ? 2 : 1;
+                    Game.board[p.y][p.x] = opp;
+                    Game.captures[last.color]--;
+                });
+                Game.koPoint = last.prevKo;
+            }
+            Game.turn = last.color;
+            Game.passCount = 0;
+            renderStones();
+            updateTurnUI();
+            resetTurnTimer();
+            logToProtocol("SYSTEM: 무르기가 적용되었습니다.", 'sys');
+        }
+
+        function handleResign(isLocal) {
+            if (isLocal && conn) conn.send({ type: 'RESIGN' });
+            const winner = isLocal ? (Game.myColor === 1 ? 2 : 1) : Game.myColor;
+            endGame(isLocal ? "Resigned by You" : "Resigned by Opponent");
+        }
+
+        document.getElementById('btn-resign').onclick = () => {
+            if (confirm("정말 기권하시겠습니까?")) handleResign(true);
+        };
+
+        function showOverlay(title, sub) {
+            document.getElementById('overlay-loading').classList.remove('hidden');
+            document.getElementById('loading-title').textContent = title;
+            document.getElementById('loading-sub').textContent = sub;
+        }
+
+        function hideOverlay() {
+            document.getElementById('overlay-loading').classList.add('hidden');
+        }
+
+        function startMatch() {
+            Game.reset();
+            renderStones();
+            updateTurnUI();
+            resetTurnTimer();
+            logToProtocol("MATCH: 대국을 시작합니다.", 'sys');
+        }
+
         window.onload = () => {
             createBoardUI();
-            initNetwork();
+            initP2P();
             lucide.createIcons();
             
-            // 복사 버튼 기능
-            document.getElementById('btn-copy-id').onclick = () => {
-                const id = document.getElementById('my-peer-id').textContent;
-                navigator.clipboard.writeText(id).then(() => alert("코드가 복사되었습니다."));
-            };
+            // 키보드 이벤트
+            window.addEventListener('keydown', (e) => {
+                if (document.activeElement.tagName === 'INPUT') return;
+                if (e.code === 'Space') { e.preventDefault(); document.getElementById('btn-pass').click(); }
+                if (e.key === 'u' || e.key === 'U') document.getElementById('btn-undo').click();
+                if (e.key === 'Enter') document.getElementById('chat-input').focus();
+            });
         };
+
     </script>
 </body>
 </html>
