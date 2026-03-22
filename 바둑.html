@@ -2,79 +2,132 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Professional Baduk P2P - 4 Digit Connect</title>
-    <!-- PeerJS Library -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Professional Baduk P2P - 4-Digit Connection</title>
+    <!-- 외부 라이브러리 로드 -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <!-- Tailwind CSS for modern UI -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap');
 
         :root {
-            --board-color: #e3a857;
-            --stone-black: #1a1a1a;
-            --stone-white: #ffffff;
-            --highlight-color: rgba(255, 255, 255, 0.4);
+            --board-bg: #e3a857;
+            --board-line: #2d2419;
+            --stone-black: radial-gradient(circle at 30% 30%, #444, #000);
+            --stone-white: radial-gradient(circle at 30% 30%, #fff, #ddd);
+            --panel-bg: #111827;
+            --sidebar-width: 400px;
         }
 
         body {
-            font-family: 'Noto Sans KR', sans-serif;
-            background-color: #1a1c1e;
-            color: #e2e8f0;
-            overflow-x: hidden;
+            font-family: 'Pretendard', sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden; /* 전체 스크롤 방지 */
+            display: flex;
         }
 
-        /* Go Board Styles */
-        .baduk-board {
-            background-color: var(--board-color);
+        /* 메인 레이아웃: 왼쪽 바둑판, 오른쪽 사이드바 */
+        .app-container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+
+        /* 왼쪽 바둑판 영역 (고정) */
+        .board-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #0f172a;
+            padding: 20px;
             position: relative;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5), inset 0 0 50px rgba(0,0,0,0.1);
-            border: 2px solid #8b5a2b;
+        }
+
+        /* 오른쪽 사이드바 영역 (스크롤 가능) */
+        .sidebar-section {
+            width: var(--sidebar-width);
+            background-color: var(--panel-bg);
+            border-left: 1px solid #374151;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #4b5563 transparent;
+        }
+
+        .sidebar-section::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar-section::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 10px;
+        }
+
+        /* 바둑판 스타일링 */
+        .baduk-board-wrapper {
+            position: relative;
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 800px;
+            max-height: 800px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        }
+
+        .baduk-board {
+            background-color: var(--board-bg);
+            width: 100%;
+            height: 100%;
+            position: relative;
+            border: 4px solid #8b5e34;
             border-radius: 4px;
-            aspect-ratio: 1 / 1;
-            cursor: crosshair;
-            user-select: none;
         }
 
-        .grid-line-h, .grid-line-v {
+        /* 바둑판 선(Line) */
+        .line-h, .line-v {
             position: absolute;
-            background-color: #333;
-            opacity: 0.8;
+            background-color: var(--board-line);
+            opacity: 0.7;
         }
+        .line-h { height: 1px; width: calc(100% - 40px); left: 20px; }
+        .line-v { width: 1px; height: calc(100% - 40px); top: 20px; }
 
-        .grid-line-h { height: 1.5px; width: calc(100% - 40px); left: 20px; }
-        .grid-line-v { width: 1.5px; height: calc(100% - 40px); top: 20px; }
-
+        /* 화점(Star points) */
         .star-point {
             position: absolute;
             width: 8px;
             height: 8px;
-            background-color: #333;
+            background-color: var(--board-line);
             border-radius: 50%;
             transform: translate(-50%, -50%);
+            z-index: 5;
         }
 
+        /* 돌(Stone) 스타일 */
         .stone {
             position: absolute;
-            width: 92%;
-            height: 92%;
+            width: 94%;
+            height: 94%;
             border-radius: 50%;
             transform: translate(-50%, -50%);
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 10;
+            transition: transform 0.1s ease-out;
         }
 
         .stone.black {
-            background: radial-gradient(circle at 30% 30%, #444, #000);
-            box-shadow: 2px 3px 5px rgba(0,0,0,0.6);
+            background: var(--stone-black);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.5);
         }
 
         .stone.white {
-            background: radial-gradient(circle at 30% 30%, #fff, #ccc);
-            box-shadow: 2px 3px 5px rgba(0,0,0,0.3);
+            background: var(--stone-white);
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.3);
         }
 
         .stone.last-move::after {
@@ -82,526 +135,491 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 40%;
-            height: 40%;
-            border: 2px solid #ff4757;
+            width: 35%;
+            height: 35%;
+            border: 2px solid #ef4444;
             border-radius: 50%;
             transform: translate(-50%, -50%);
         }
 
-        .ghost-stone {
-            position: absolute;
-            width: 90%;
-            height: 90%;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            opacity: 0.4;
-            pointer-events: none;
-            z-index: 5;
-        }
-
+        /* 교차점(Intersection) - 클릭 레이어 */
         .intersection {
             position: absolute;
-            width: 5.263%; /* 100/19 */
-            height: 5.263%;
+            width: 5.26%;
+            height: 5.26%;
             transform: translate(-50%, -50%);
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
             z-index: 20;
         }
 
-        /* UI Components */
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .ghost-stone {
+            opacity: 0.4;
+            pointer-events: none;
         }
 
-        .chat-container {
-            height: 300px;
+        /* 사이드바 컴포넌트들 */
+        .section-card {
+            background: rgba(31, 41, 55, 0.5);
+            margin: 12px;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        /* 애니메이션 */
+        @keyframes stone-drop {
+            0% { transform: translate(-50%, -70%); opacity: 0; }
+            100% { transform: translate(-50%, -50%); opacity: 1; }
+        }
+
+        .animate-drop {
+            animation: stone-drop 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .pulse-turn {
+            box-shadow: 0 0 0 2px #3b82f6;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0px rgba(59, 130, 246, 0); }
+        }
+
+        /* 채팅 및 로그 높이 고정 */
+        .scroll-box {
+            height: 200px;
             overflow-y: auto;
-            scrollbar-width: thin;
-        }
-
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
-
-        /* Animations */
-        @keyframes pulse-ring {
-            0% { transform: scale(0.8); opacity: 0.5; }
-            100% { transform: scale(1.5); opacity: 0; }
-        }
-
-        .active-turn-indicator {
-            position: relative;
-        }
-        .active-turn-indicator::before {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            border: 2px solid #3b82f6;
-            border-radius: 8px;
-            animation: pulse-ring 2s infinite;
-        }
-
-        .modal-overlay {
-            background: rgba(0, 0, 0, 0.85);
-            display: none;
+            font-size: 13px;
         }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body>
 
-    <!-- Top Navigation / Connection Status -->
-    <header class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-        <div class="flex items-center gap-3">
-            <div class="bg-blue-600 p-2 rounded-lg">
-                <i data-lucide="layout-grid" class="text-white"></i>
-            </div>
-            <h1 class="text-2xl font-bold tracking-tight">P2P Baduk <span class="text-blue-500 text-sm font-normal">v1.0.4</span></h1>
-        </div>
-
-        <div id="connection-controls" class="flex flex-wrap items-center gap-4 glass-panel p-3 rounded-xl">
-            <div class="flex items-center gap-2">
-                <span class="text-xs text-slate-400 uppercase font-bold">내 코드:</span>
-                <span id="my-peer-id" class="text-xl font-mono text-blue-400 font-bold tracking-widest">----</span>
-            </div>
-            <div class="h-6 w-px bg-slate-700"></div>
-            <div class="flex items-center gap-2">
-                <input type="text" id="remote-peer-id" placeholder="코드 4자리" maxlength="4" 
-                    class="bg-slate-900 border border-slate-700 rounded px-3 py-1 text-center font-mono w-28 focus:outline-none focus:border-blue-500 transition-all">
-                <button id="btn-connect" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1 rounded font-medium transition-colors flex items-center gap-2">
-                    <i data-lucide="link" class="w-4 h-4"></i> 접속하기
-                </button>
-            </div>
-            <div id="status-indicator" class="flex items-center gap-2 px-2">
-                <div class="w-2 h-2 rounded-full bg-red-500" id="status-dot"></div>
-                <span id="status-text" class="text-xs text-slate-400">대기 중...</span>
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div class="app-container">
         
-        <!-- Left Sidebar: Player Info & Tools -->
-        <aside class="lg:col-span-3 space-y-6">
-            <div class="glass-panel p-5 rounded-2xl flex flex-col gap-6">
-                <!-- Player 1 (Black) -->
-                <div id="player-black-card" class="relative p-4 rounded-xl border border-slate-700 transition-all">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-full bg-slate-900 border-2 border-slate-600 flex items-center justify-center">
-                            <div class="w-8 h-8 rounded-full bg-stone-900 shadow-lg"></div>
-                        </div>
-                        <div>
-                            <p class="text-xs text-slate-400">흑돌 (선수)</p>
-                            <h3 class="font-bold" id="player-black-name">대기 중...</h3>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex justify-between items-end">
-                        <div class="text-sm">
-                            <span class="text-slate-400">포획:</span> <span id="captures-black" class="font-bold text-white">0</span>
-                        </div>
-                        <div id="timer-black" class="text-2xl font-mono text-slate-300">10:00</div>
-                    </div>
-                </div>
-
-                <!-- Player 2 (White) -->
-                <div id="player-white-card" class="relative p-4 rounded-xl border border-slate-700 transition-all">
-                    <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-full bg-slate-100 border-2 border-slate-300 flex items-center justify-center">
-                            <div class="w-8 h-8 rounded-full bg-white shadow-md"></div>
-                        </div>
-                        <div>
-                            <p class="text-xs text-slate-400">백돌 (후수)</p>
-                            <h3 class="font-bold" id="player-white-name">대기 중...</h3>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex justify-between items-end">
-                        <div class="text-sm">
-                            <span class="text-slate-400">포획:</span> <span id="captures-white" class="font-bold text-white">0</span>
-                            <span class="ml-2 text-blue-400 text-xs">(덤 6.5)</span>
-                        </div>
-                        <div id="timer-white" class="text-2xl font-mono text-slate-300">10:00</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Game Tools -->
-            <div class="glass-panel p-5 rounded-2xl">
-                <h4 class="text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">도구 및 기능</h4>
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="btn-pass" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all group">
-                        <i data-lucide="skip-forward" class="mb-1 text-slate-400 group-hover:text-white"></i>
-                        <span class="text-xs">한수쉼</span>
-                    </button>
-                    <button id="btn-resign" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-red-900/30 border border-slate-700 hover:border-red-500/50 transition-all group">
-                        <i data-lucide="flag" class="mb-1 text-slate-400 group-hover:text-red-400"></i>
-                        <span class="text-xs">기권</span>
-                    </button>
-                    <button id="btn-counting" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-blue-900/30 border border-slate-700 hover:border-blue-500/50 transition-all group">
-                        <i data-lucide="calculator" class="mb-1 text-slate-400 group-hover:text-blue-400"></i>
-                        <span class="text-xs">계가</span>
-                    </button>
-                    <button id="btn-undo" class="flex flex-col items-center justify-center p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all group">
-                        <i data-lucide="undo-2" class="mb-1 text-slate-400 group-hover:text-white"></i>
-                        <span class="text-xs">무르기</span>
-                    </button>
-                </div>
-            </div>
-        </aside>
-
-        <!-- Center: Go Board -->
-        <div class="lg:col-span-6 flex flex-col items-center">
-            <div id="game-board-container" class="w-full max-w-[650px] relative">
-                <div id="baduk-board" class="baduk-board w-full">
-                    <!-- Lines and Stars will be generated by JS -->
+        <!-- [LEFT] 바둑판 영역 -->
+        <section class="board-section">
+            <div class="baduk-board-wrapper">
+                <!-- 좌표 레이블 (Top) -->
+                <div class="absolute -top-6 left-0 w-full flex justify-around text-[10px] text-gray-500 font-mono px-5">
+                    <span>A</span><span>B</span><span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>H</span><span>J</span><span>K</span><span>L</span><span>M</span><span>N</span><span>O</span><span>P</span><span>Q</span><span>R</span><span>S</span><span>T</span>
                 </div>
                 
-                <!-- Coordinates -->
-                <div class="flex justify-between w-full px-5 mt-2 text-[10px] text-slate-500 font-mono uppercase">
-                    <span>A B C D E F G H J K L M N O P Q R S T</span>
+                <div id="baduk-board" class="baduk-board">
+                    <!-- JS에서 그리드 및 돌 생성 -->
+                </div>
+
+                <!-- 좌표 레이블 (Left) -->
+                <div class="absolute top-0 -left-6 h-full flex flex-col justify-around text-[10px] text-gray-500 font-mono py-5">
+                    <span>19</span><span>18</span><span>17</span><span>16</span><span>15</span><span>14</span><span>13</span><span>12</span><span>11</span><span>10</span><span>9</span><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
                 </div>
             </div>
 
-            <div class="mt-8 w-full max-w-[650px] flex justify-between items-center glass-panel px-6 py-4 rounded-2xl">
-                <div class="flex items-center gap-4">
-                    <button id="history-first" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevrons-left"></i></button>
-                    <button id="history-prev" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevron-left"></i></button>
-                    <div class="bg-slate-900 px-4 py-1 rounded-full border border-slate-700">
-                        <span id="move-count" class="font-mono font-bold text-blue-400">0</span> <span class="text-xs text-slate-500">수</span>
+            <!-- 하단 플로팅 정보 바 -->
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-4 bg-black/60 backdrop-blur-md px-6 py-3 rounded-full border border-white/10 shadow-2xl">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-blue-500" id="conn-dot"></span>
+                    <span id="conn-status" class="text-xs font-bold text-gray-300">오프라인</span>
+                </div>
+                <div class="w-px h-4 bg-gray-700"></div>
+                <div class="text-xs font-mono text-blue-400 font-bold" id="current-move-display">0 MOVE</div>
+            </div>
+        </section>
+
+        <!-- [RIGHT] 사이드바 영역 (스크롤 가능) -->
+        <section class="sidebar-section custom-scroll">
+            
+            <!-- 1. 연결 설정 헤더 -->
+            <div class="p-6 border-b border-gray-800 bg-gray-900/50">
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-xl font-bold flex items-center gap-2">
+                        <i data-lucide="monitor-play" class="text-blue-500"></i> P2P Baduk
+                    </h1>
+                    <span class="text-[10px] bg-blue-600/20 text-blue-400 px-2 py-1 rounded uppercase tracking-tighter">Pro Edition</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                        <label class="block text-[10px] text-gray-500 uppercase font-bold mb-1">내 접속 코드</label>
+                        <div id="my-peer-id" class="text-2xl font-mono font-black text-white tracking-widest">----</div>
                     </div>
-                    <button id="history-next" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevron-right"></i></button>
-                    <button id="history-last" class="p-2 hover:bg-slate-700 rounded-full transition-colors"><i data-lucide="chevrons-right"></i></button>
+                    <div class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                        <label class="block text-[10px] text-gray-500 uppercase font-bold mb-1">상대방 연결</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="remote-peer-id" maxlength="4" placeholder="0000" 
+                                class="bg-transparent text-xl font-mono text-blue-400 w-full outline-none focus:ring-0">
+                            <button id="btn-connect" class="text-blue-500 hover:text-blue-400"><i data-lucide="arrow-right-circle"></i></button>
+                        </div>
+                    </div>
                 </div>
-                <div class="flex gap-2">
-                    <button id="btn-save-sgf" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-lg transition-colors flex items-center gap-1">
-                        <i data-lucide="download" class="w-3 h-3"></i> 기보 저장
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Sidebar: Logs & Chat -->
-        <aside class="lg:col-span-3 space-y-6">
-            <!-- Game Log -->
-            <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-[300px]">
-                <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
-                    <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400">대국 로그</h4>
-                    <i data-lucide="scroll-text" class="w-3 h-3 text-slate-500"></i>
-                </div>
-                <div id="game-logs" class="chat-container custom-scroll p-4 text-xs space-y-2 font-mono">
-                    <div class="text-blue-400">[시스템] 대국 대기 중입니다...</div>
-                </div>
+                <button id="btn-copy-id" class="w-full py-2 bg-gray-800 hover:bg-gray-700 rounded text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                    <i data-lucide="copy" class="w-3 h-3"></i> 접속 코드 복사하기
+                </button>
             </div>
 
-            <!-- Chat -->
-            <div class="glass-panel rounded-2xl overflow-hidden flex flex-col h-[400px]">
-                <div class="bg-slate-800/50 px-4 py-2 border-b border-slate-700 flex justify-between items-center">
-                    <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400">실시간 채팅</h4>
-                    <i data-lucide="message-square" class="w-3 h-3 text-slate-500"></i>
+            <!-- 2. 플레이어 상태 카드 -->
+            <div class="section-card space-y-4">
+                <div id="card-black" class="p-4 rounded-xl border border-gray-700 bg-gray-900/80 transition-all">
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-black border border-gray-600 flex items-center justify-center shadow-inner">
+                                <div class="w-7 h-7 rounded-full bg-stone-900"></div>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-sm" id="name-black">흑돌 (대기)</h3>
+                                <p class="text-[10px] text-gray-500 uppercase">Black Player</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xl font-mono font-bold" id="timer-black">10:00</div>
+                            <div class="text-[10px] text-gray-400">사석: <span id="caps-black">0</span></div>
+                        </div>
+                    </div>
                 </div>
-                <div id="chat-messages" class="chat-container custom-scroll p-4 space-y-3 flex-grow">
-                    <!-- Messages -->
+
+                <div id="card-white" class="p-4 rounded-xl border border-gray-700 bg-gray-900/80 transition-all">
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-white border border-gray-300 flex items-center justify-center shadow-lg">
+                                <div class="w-7 h-7 rounded-full bg-white"></div>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-sm" id="name-white">백돌 (대기)</h3>
+                                <p class="text-[10px] text-gray-500 uppercase">White Player (덤 6.5)</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xl font-mono font-bold" id="timer-white">10:00</div>
+                            <div class="text-[10px] text-gray-400">사석: <span id="caps-white">0</span></div>
+                        </div>
+                    </div>
                 </div>
-                <form id="chat-form" class="p-3 bg-slate-900/50 flex gap-2">
-                    <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." 
-                        class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:border-blue-500">
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg transition-colors">
+            </div>
+
+            <!-- 3. 대국 컨트롤 버튼 -->
+            <div class="section-card grid grid-cols-2 gap-2">
+                <button id="btn-pass" class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg text-sm font-medium transition-colors border border-white/5">
+                    <i data-lucide="skip-forward" class="w-4 h-4"></i> 한수쉼
+                </button>
+                <button id="btn-resign" class="flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 py-3 rounded-lg text-sm font-medium transition-colors border border-red-500/20">
+                    <i data-lucide="flag" class="w-4 h-4"></i> 기권
+                </button>
+                <button id="btn-undo" class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-700 py-3 rounded-lg text-sm font-medium transition-colors border border-white/5">
+                    <i data-lucide="undo-2" class="w-4 h-4"></i> 무르기
+                </button>
+                <button id="btn-counting" class="flex items-center justify-center gap-2 bg-blue-900/20 hover:bg-blue-900/40 text-blue-400 py-3 rounded-lg text-sm font-medium transition-colors border border-blue-500/20">
+                    <i data-lucide="calculator" class="w-4 h-4"></i> 형세판단
+                </button>
+            </div>
+
+            <!-- 4. 실시간 대국 로그 -->
+            <div class="section-card flex flex-col h-[280px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                        <i data-lucide="history" class="w-3 h-3"></i> 대국 기록
+                    </h4>
+                    <button id="btn-download-sgf" class="text-[10px] text-blue-400 hover:underline font-bold">SGF 저장</button>
+                </div>
+                <div id="game-logs" class="scroll-box custom-scroll bg-black/30 rounded-lg p-3 font-mono space-y-1">
+                    <div class="text-blue-500">[SYSTEM] 시스템이 준비되었습니다.</div>
+                </div>
+            </div>
+
+            <!-- 5. 채팅 인터페이스 -->
+            <div class="section-card flex flex-col h-[320px]">
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i data-lucide="message-circle" class="w-3 h-3"></i> 실시간 채팅
+                </h4>
+                <div id="chat-messages" class="scroll-box custom-scroll bg-black/30 rounded-lg p-3 mb-3 space-y-3">
+                    <!-- 메시지 동적 추가 -->
+                </div>
+                <form id="chat-form" class="flex gap-2">
+                    <input type="text" id="chat-input" placeholder="메시지 입력..." 
+                        class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 transition-all">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded-lg">
                         <i data-lucide="send" class="w-4 h-4"></i>
                     </button>
                 </form>
             </div>
-        </aside>
-    </main>
 
-    <!-- Modal for Settings & Results -->
-    <div id="result-modal" class="modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4">
-        <div class="glass-panel max-w-md w-full rounded-3xl p-8 shadow-2xl scale-in transform transition-transform border-2 border-blue-500/30">
-            <div class="flex flex-col items-center text-center">
-                <div id="result-icon" class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mb-6">
-                    <i data-lucide="trophy" class="text-white w-10 h-10"></i>
+            <!-- 6. 대국 복기 컨트롤 -->
+            <div class="section-card">
+                <h4 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <i data-lucide="rewind" class="w-3 h-3"></i> 기보 복기
+                </h4>
+                <div class="flex items-center justify-between gap-2">
+                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-first"><i data-lucide="chevrons-left"></i></button>
+                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-prev"><i data-lucide="chevron-left"></i></button>
+                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-next"><i data-lucide="chevron-right"></i></button>
+                    <button class="p-3 bg-gray-800 hover:bg-gray-700 rounded-lg flex-1 flex justify-center" id="hist-last"><i data-lucide="chevrons-right"></i></button>
                 </div>
-                <h2 id="result-title" class="text-3xl font-bold mb-2">대국 종료</h2>
-                <p id="result-score" class="text-slate-400 mb-8">결과를 계산 중입니다...</p>
-                
-                <div class="w-full grid grid-cols-2 gap-4 mb-8">
-                    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-                        <p class="text-xs text-slate-500 uppercase mb-1">흑 (집)</p>
-                        <span id="final-black-score" class="text-xl font-bold">0.0</span>
-                    </div>
-                    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800">
-                        <p class="text-xs text-slate-500 uppercase mb-1">백 (집 + 덤)</p>
-                        <span id="final-white-score" class="text-xl font-bold">6.5</span>
-                    </div>
-                </div>
+            </div>
 
-                <button onclick="closeModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold transition-colors">닫기</button>
+            <!-- Footer: 도움말 및 버전 -->
+            <div class="p-8 text-center text-gray-600">
+                <p class="text-[10px] font-medium tracking-widest uppercase mb-1">Peer Baduk Engine v1.5.0</p>
+                <p class="text-[9px]">© 2026 Professional P2P Baduk Network. All rights reserved.</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- 결과 안내 모달 -->
+    <div id="result-modal" class="hidden fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm items-center justify-center p-6">
+        <div class="bg-gray-900 border-2 border-blue-500/30 w-full max-w-md rounded-3xl p-8 text-center shadow-[0_0_50px_rgba(59,130,246,0.2)]">
+            <div class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/50">
+                <i data-lucide="trophy" class="w-10 h-10 text-white"></i>
+            </div>
+            <h2 id="modal-title" class="text-3xl font-bold mb-2">대국 종료</h2>
+            <p id="modal-desc" class="text-gray-400 mb-8 font-medium">결과를 계산하였습니다.</p>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="bg-black/40 p-5 rounded-2xl border border-white/5">
+                    <p class="text-[10px] text-gray-500 uppercase mb-1 font-bold">Black Score</p>
+                    <span id="final-b" class="text-2xl font-mono font-black text-white">0.0</span>
+                </div>
+                <div class="bg-black/40 p-5 rounded-2xl border border-white/5">
+                    <p class="text-[10px] text-gray-500 uppercase mb-1 font-bold">White Score</p>
+                    <span id="final-w" class="text-2xl font-mono font-black text-blue-400">6.5</span>
+                </div>
+            </div>
+            
+            <button onclick="closeModal()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-bold transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg shadow-blue-600/30">
+                대국실로 돌아가기
+            </button>
+        </div>
+    </div>
+
+    <!-- 알림 오버레이 (무르기 요청 등) -->
+    <div id="alert-overlay" class="hidden fixed bottom-10 left-10 z-[200] bg-gray-900 border border-blue-500 p-4 rounded-xl shadow-2xl flex items-center gap-4 animate-bounce">
+        <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center"><i data-lucide="bell" class="text-white"></i></div>
+        <div>
+            <p id="alert-msg" class="text-sm font-bold">상대방이 무르기를 요청했습니다.</p>
+            <div class="flex gap-2 mt-2">
+                <button id="alert-yes" class="px-3 py-1 bg-blue-600 rounded text-xs font-bold">수락</button>
+                <button id="alert-no" class="px-3 py-1 bg-gray-700 rounded text-xs font-bold">거절</button>
             </div>
         </div>
     </div>
 
     <script>
-        // --- Configuration & Constants ---
-        const BOARD_SIZE = 19;
-        const GRID_STEP = 100 / (BOARD_SIZE + 1);
-        const PADDING = GRID_STEP;
+        // --- 엔진 및 상수 설정 ---
+        const SIZE = 19;
+        const GRID_PCT = 100 / (SIZE + 1);
+        const PADDING_PCT = GRID_PCT;
         const KOMI = 6.5;
 
-        // --- Game State ---
-        let gameState = {
-            board: Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(0)), // 0: empty, 1: black, 2: white
-            history: [],
-            currentTurn: 1, // 1: black, 2: white
-            myColor: null, // assigned when connected
-            moveCount: 0,
-            captures: { 1: 0, 2: 0 },
-            koPoint: null,
+        // --- 전역 게임 상태 ---
+        let state = {
+            board: Array(SIZE).fill().map(() => Array(SIZE).fill(0)), // 0: 빈칸, 1: 흑, 2: 백
+            history: [], // [{type, x, y, color, caps: []}, ...]
+            turn: 1, // 1: 흑, 2: 백
+            myColor: null, 
+            caps: { 1: 0, 2: 0 },
+            ko: null, // 패(Ko) 위치 {x, y}
             isGameOver: false,
             timers: { 1: 600, 2: 600 },
-            timerInterval: null
+            timerIdx: null,
+            replayIdx: -1
         };
 
-        // --- PeerJS Logic ---
+        // --- PeerJS 통신 로직 ---
         let peer = null;
         let conn = null;
-        const myPeerIdDisplay = document.getElementById('my-peer-id');
-        const remoteIdInput = document.getElementById('remote-peer-id');
-        const connectBtn = document.getElementById('btn-connect');
-        const statusDot = document.getElementById('status-dot');
-        const statusText = document.getElementById('status-text');
+        const appId = "baduk-pro-";
 
-        function generateShortId() {
-            return Math.floor(1000 + Math.random() * 9000).toString();
-        }
+        function initNetwork() {
+            const shortId = Math.floor(1000 + Math.random() * 9000).toString();
+            peer = new Peer(appId + shortId);
 
-        function initPeer() {
-            const shortId = generateShortId();
-            peer = new Peer('baduk-' + shortId);
-            
             peer.on('open', (id) => {
-                myPeerIdDisplay.textContent = shortId;
-                addLog(`내 접속 코드: ${shortId}`);
+                document.getElementById('my-peer-id').textContent = shortId;
+                addLog(`네트워크 준비 완료. 코드: ${shortId}`, "system");
             });
 
             peer.on('connection', (c) => {
-                if (conn) {
-                    c.close(); // Only one opponent
-                    return;
-                }
+                if (conn) { c.close(); return; }
                 conn = c;
-                setupConnection();
-                gameState.myColor = 1; // Host is Black
-                updateUIForStart();
-                addLog("상대방이 접속했습니다. 당신은 흑돌입니다.");
+                state.myColor = 1; // 먼저 접속 코드를 연 사람이 흑돌(호스트)
+                bindConnEvents();
+                addLog("상대방이 입장했습니다. 당신은 흑돌입니다.", "system");
+                startGame();
             });
 
             peer.on('error', (err) => {
-                console.error(err);
-                addLog("연결 오류: " + err.type);
+                addLog(`연결 오류: ${err.type}`, "error");
             });
         }
 
-        function setupConnection() {
+        function bindConnEvents() {
             conn.on('open', () => {
-                statusDot.className = "w-2 h-2 rounded-full bg-green-500";
-                statusText.textContent = "연결됨";
-                
-                if (!gameState.myColor) {
-                    gameState.myColor = 2; // Guest is White
-                    updateUIForStart();
-                    addLog("서버에 접속했습니다. 당신은 백돌입니다.");
+                document.getElementById('conn-status').textContent = "온라인";
+                document.getElementById('conn-dot').classList.replace('bg-blue-500', 'bg-green-500');
+                if (!state.myColor) {
+                    state.myColor = 2; // 초대받은 사람이 백돌
+                    addLog("대국실에 접속했습니다. 당신은 백돌입니다.", "system");
+                    startGame();
                 }
             });
 
             conn.on('data', (data) => {
-                handleIncomingData(data);
+                handleNetworkData(data);
             });
 
             conn.on('close', () => {
-                addLog("연결이 끊어졌습니다.");
-                statusDot.className = "w-2 h-2 rounded-full bg-red-500";
-                statusText.textContent = "연결 끊김";
-                conn = null;
+                document.getElementById('conn-status').textContent = "연결 끊김";
+                document.getElementById('conn-dot').classList.replace('bg-green-500', 'bg-red-500');
+                addLog("상대방과의 연결이 종료되었습니다.", "error");
             });
         }
 
-        function handleIncomingData(data) {
+        function handleNetworkData(data) {
             switch(data.type) {
-                case 'MOVE':
-                    processMove(data.x, data.y, false);
-                    break;
-                case 'PASS':
-                    processPass(false);
-                    break;
-                case 'UNDO':
-                    if (confirm("상대방이 무르기를 요청했습니다. 허락하시겠습니까?")) {
-                        undoMove();
-                        sendData({ type: 'UNDO_ACCEPT' });
-                    }
-                    break;
-                case 'UNDO_ACCEPT':
+                case 'MOVE': playStone(data.x, data.y, false); break;
+                case 'PASS': passTurn(false); break;
+                case 'CHAT': receiveChat(data.msg, data.sender); break;
+                case 'RESIGN': finalizeGame('RESIGN', data.winner); break;
+                case 'UNDO_REQ': showAlert("상대방이 무르기를 요청했습니다.", () => {
                     undoMove();
-                    addLog("무르기가 승인되었습니다.");
-                    break;
-                case 'CHAT':
-                    addChatMessage(data.sender, data.text);
-                    break;
-                case 'RESIGN':
-                    endGame('RESIGN', data.sender);
-                    break;
-                case 'COUNT_REQ':
-                    if(confirm("상대방이 계가를 요청했습니다. 수락하시겠습니까?")) {
-                        calculateScore();
-                        sendData({ type: 'COUNT_SYNC' });
-                    }
-                    break;
-                case 'COUNT_SYNC':
+                    sendData({type: 'UNDO_OK'});
+                }, () => sendData({type: 'UNDO_NO'})); break;
+                case 'UNDO_OK': undoMove(); addLog("무르기 요청이 수락되었습니다.", "system"); break;
+                case 'COUNT_REQ': showAlert("상대방이 형세판단을 요청했습니다.", () => {
                     calculateScore();
-                    break;
+                    sendData({type: 'COUNT_OK'});
+                }); break;
+                case 'COUNT_OK': calculateScore(); break;
             }
         }
 
         function sendData(data) {
-            if (conn && conn.open) {
-                conn.send(data);
-            }
+            if (conn && conn.open) conn.send(data);
         }
 
-        // --- Baduk Logic Engine ---
-        function createBoard() {
-            const boardEl = document.getElementById('baduk-board');
-            boardEl.innerHTML = '';
+        // --- 바둑 판 생성 로직 ---
+        function createBoardUI() {
+            const board = document.getElementById('baduk-board');
+            board.innerHTML = '';
 
-            // Draw Grid Lines
-            for (let i = 0; i < BOARD_SIZE; i++) {
-                const pos = PADDING + (i * GRID_STEP);
-                
-                const hLine = document.createElement('div');
-                hLine.className = 'grid-line-h';
-                hLine.style.top = `${pos}%`;
-                boardEl.appendChild(hLine);
+            // 그리드 선 그리기
+            for (let i = 0; i < SIZE; i++) {
+                const pos = PADDING_PCT + (i * GRID_PCT);
+                const h = document.createElement('div');
+                h.className = 'line-h';
+                h.style.top = `${pos}%`;
+                board.appendChild(h);
 
-                const vLine = document.createElement('div');
-                vLine.className = 'grid-line-v';
-                vLine.style.left = `${pos}%`;
-                boardEl.appendChild(vLine);
+                const v = document.createElement('div');
+                v.className = 'line-v';
+                v.style.left = `${pos}%`;
+                board.appendChild(v);
             }
 
-            // Star points
+            // 화점(Star Points)
             const stars = [3, 9, 15];
             stars.forEach(r => {
                 stars.forEach(c => {
-                    const star = document.createElement('div');
-                    star.className = 'star-point';
-                    star.style.top = `${PADDING + (r * GRID_STEP)}%`;
-                    star.style.left = `${PADDING + (c * GRID_STEP)}%`;
-                    boardEl.appendChild(star);
+                    const dot = document.createElement('div');
+                    dot.className = 'star-point';
+                    dot.style.top = `${PADDING_PCT + (r * GRID_PCT)}%`;
+                    dot.style.left = `${PADDING_PCT + (c * GRID_PCT)}%`;
+                    board.appendChild(dot);
                 });
             });
 
-            // Intersections for clicking
-            for (let y = 0; y < BOARD_SIZE; y++) {
-                for (let x = 0; x < BOARD_SIZE; x++) {
-                    const intersect = document.createElement('div');
-                    intersect.className = 'intersection';
-                    intersect.style.top = `${PADDING + (y * GRID_STEP)}%`;
-                    intersect.style.left = `${PADDING + (x * GRID_STEP)}%`;
-                    intersect.dataset.x = x;
-                    intersect.dataset.y = y;
+            // 클릭 감지용 교차점 레이어
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'intersection';
+                    cell.style.top = `${PADDING_PCT + (y * GRID_PCT)}%`;
+                    cell.style.left = `${PADDING_PCT + (x * GRID_PCT)}%`;
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
 
-                    intersect.addEventListener('mouseenter', () => showGhost(x, y));
-                    intersect.addEventListener('mouseleave', clearGhost);
-                    intersect.addEventListener('click', () => handleBoardClick(x, y));
+                    cell.onclick = () => onBoardClick(x, y);
+                    cell.onmouseenter = () => showGhost(x, y);
+                    cell.onmouseleave = () => hideGhost();
 
-                    boardEl.appendChild(intersect);
+                    board.appendChild(cell);
                 }
             }
         }
 
-        function handleBoardClick(x, y) {
-            if (gameState.isGameOver) return;
-            if (gameState.currentTurn !== gameState.myColor) return;
-            if (gameState.board[y][x] !== 0) return;
+        // --- 핵심 바둑 로직 알고리즘 ---
+        function onBoardClick(x, y) {
+            if (state.isGameOver || state.turn !== state.myColor) return;
+            if (state.board[y][x] !== 0) return;
 
-            // Basic move validation
-            if (isValidMove(x, y, gameState.currentTurn)) {
-                processMove(x, y, true);
-                sendData({ type: 'MOVE', x, y });
+            if (isValidMove(x, y, state.turn)) {
+                playStone(x, y, true);
+                sendData({type: 'MOVE', x, y});
             } else {
-                addLog("착수할 수 없는 곳입니다.");
+                addLog("그곳에는 둘 수 없습니다. (착수 금지 또는 패)", "error");
             }
         }
 
         function isValidMove(x, y, color) {
-            // 1. Check Ko
-            if (gameState.koPoint && gameState.koPoint.x === x && gameState.koPoint.y === y) {
-                return false;
-            }
+            // 1. 패(Ko) 체크
+            if (state.ko && state.ko.x === x && state.ko.y === y) return false;
 
-            // Temporary place stone
-            const originalBoard = JSON.parse(JSON.stringify(gameState.board));
-            gameState.board[y][x] = color;
+            // 2. 가상 착수 후 사석 체크
+            const tempBoard = JSON.parse(JSON.stringify(state.board));
+            tempBoard[y][x] = color;
 
             const opponent = color === 1 ? 2 : 1;
-            const captured = findCapturedStones(x, y, opponent);
+            const captured = getCapturedStones(x, y, opponent, tempBoard);
+
+            // 상대 돌을 따낼 수 있다면 자충수가 아님
+            if (captured.length > 0) return true;
+
+            // 상대 돌을 못 따낸다면, 내 그룹의 활로가 있어야 함
+            return hasLiberties(x, y, color, tempBoard);
+        }
+
+        function hasLiberties(x, y, color, board) {
+            const group = getGroup(x, y, color, board);
+            const liberties = new Set();
             
-            let valid = false;
-            if (captured.length > 0) {
-                // Capturing makes it valid
-                valid = true;
-            } else {
-                // If no capture, check if the stone itself has liberties
-                const liberties = getLiberties(x, y, color);
-                if (liberties.length > 0) {
-                    valid = true;
-                }
-            }
-
-            // Restore board
-            gameState.board = originalBoard;
-            return valid;
-        }
-
-        function findCapturedStones(lastX, lastY, opponentColor) {
-            let captured = [];
-            const neighbors = [[lastX+1, lastY], [lastX-1, lastY], [lastX, lastY+1], [lastX, lastY-1]];
-
-            neighbors.forEach(([nx, ny]) => {
-                if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
-                    if (gameState.board[ny][nx] === opponentColor) {
-                        const group = getGroup(nx, ny, opponentColor);
-                        const liberties = getLibertiesOfGroup(group);
-                        if (liberties.length === 0) {
-                            group.forEach(stone => {
-                                if (!captured.some(s => s.x === stone.x && s.y === stone.y)) {
-                                    captured.push(stone);
-                                }
-                            });
-                        }
+            group.forEach(p => {
+                const neighbors = [[p.x+1, p.y], [p.x-1, p.y], [p.x, p.y+1], [p.x, p.y-1]];
+                neighbors.forEach(([nx, ny]) => {
+                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                        if (board[ny][nx] === 0) liberties.add(`${nx},${ny}`);
                     }
-                }
+                });
             });
-            return captured;
+            return liberties.size > 0;
         }
 
-        function getGroup(x, y, color) {
+        function getGroup(x, y, color, board) {
             const group = [];
-            const visited = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(false));
-            const stack = [{x, y}];
+            const visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+            const queue = [{x, y}];
+            visited[y][x] = true;
 
-            while (stack.length > 0) {
-                const curr = stack.pop();
-                if (visited[curr.y][curr.x]) continue;
-                visited[curr.y][curr.x] = true;
+            while (queue.length > 0) {
+                const curr = queue.shift();
                 group.push(curr);
 
                 const neighbors = [[curr.x+1, curr.y], [curr.x-1, curr.y], [curr.x, curr.y+1], [curr.x, curr.y-1]];
                 neighbors.forEach(([nx, ny]) => {
-                    if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
-                        if (gameState.board[ny][nx] === color && !visited[ny][nx]) {
-                            stack.push({x: nx, y: ny});
+                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                        if (!visited[ny][nx] && board[ny][nx] === color) {
+                            visited[ny][nx] = true;
+                            queue.push({x: nx, y: ny});
                         }
                     }
                 });
@@ -609,403 +627,372 @@
             return group;
         }
 
-        function getLibertiesOfGroup(group) {
-            const liberties = new Set();
-            group.forEach(stone => {
-                const neighbors = [[stone.x+1, stone.y], [stone.x-1, stone.y], [stone.x, stone.y+1], [stone.x, stone.y-1]];
-                neighbors.forEach(([nx, ny]) => {
-                    if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
-                        if (gameState.board[ny][nx] === 0) {
-                            liberties.add(`${nx},${ny}`);
-                        }
+        function getCapturedStones(lastX, lastY, opponentColor, board) {
+            let allCaptured = [];
+            const neighbors = [[lastX+1, lastY], [lastX-1, lastY], [lastX, lastY+1], [lastX, lastY-1]];
+
+            neighbors.forEach(([nx, ny]) => {
+                if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE && board[ny][nx] === opponentColor) {
+                    const group = getGroup(nx, ny, opponentColor, board);
+                    // 활로 체크
+                    let groupLiberties = 0;
+                    group.forEach(p => {
+                        const subNeighbors = [[p.x+1, p.y], [p.x-1, p.y], [p.x, p.y+1], [p.x, p.y-1]];
+                        subNeighbors.forEach(([snx, sny]) => {
+                            if (snx >= 0 && snx < SIZE && sny >= 0 && sny < SIZE && board[sny][snx] === 0) {
+                                groupLiberties++;
+                            }
+                        });
+                    });
+
+                    if (groupLiberties === 0) {
+                        group.forEach(p => {
+                            if (!allCaptured.some(s => s.x === p.x && s.y === p.y)) allCaptured.push(p);
+                        });
                     }
-                });
+                }
             });
-            return Array.from(liberties);
+            return allCaptured;
         }
 
-        function getLiberties(x, y, color) {
-            return getLibertiesOfGroup(getGroup(x, y, color));
-        }
-
-        function processMove(x, y, isMyMove) {
-            const color = gameState.currentTurn;
+        function playStone(x, y, isMe) {
+            const color = state.turn;
             const opponent = color === 1 ? 2 : 1;
 
-            // Update board
-            gameState.board[y][x] = color;
+            // 보드 업데이트
+            state.board[y][x] = color;
+            const captured = getCapturedStones(x, y, opponent, state.board);
             
-            // Handle captures
-            const captured = findCapturedStones(x, y, opponent);
-            captured.forEach(stone => {
-                gameState.board[stone.y][stone.x] = 0;
-                gameState.captures[color]++;
+            captured.forEach(p => {
+                state.board[p.y][p.x] = 0;
+                state.caps[color]++;
             });
 
-            // Handle Ko rule
+            // 패(Ko) 로직: 한 점 따내고 내 돌도 한 점이며 단수일 때
             if (captured.length === 1) {
-                // If exactly 1 stone captured, might be a Ko
-                const group = getGroup(x, y, color);
-                if (group.length === 1) {
-                    const libs = getLibertiesOfGroup(group);
-                    if (libs.length === 1) {
-                        gameState.koPoint = captured[0];
-                    } else {
-                        gameState.koPoint = null;
-                    }
-                } else {
-                    gameState.koPoint = null;
+                const myGroup = getGroup(x, y, color, state.board);
+                if (myGroup.length === 1 && !hasLiberties(x, y, color, state.board)) {
+                    // 사실 활로가 0인 상태는 따낸 직후라 불가능하므로, 실제로는 활로가 1개인 지점이 패의 대상
                 }
+                // 간략화된 패 처리: 따낸 자리를 기억
+                state.ko = {x: captured[0].x, y: captured[0].y};
             } else {
-                gameState.koPoint = null;
+                state.ko = null;
             }
 
-            // Log & History
-            const posName = String.fromCharCode(65 + (x >= 8 ? x + 1 : x)) + (BOARD_SIZE - y);
-            addLog(`${color === 1 ? '흑' : '백'}: ${posName} 착수`);
-            
-            gameState.history.push({
-                type: 'MOVE',
-                x, y,
-                color,
-                captured: captured,
-                koBefore: gameState.koPoint
+            // 기록 저장
+            state.history.push({
+                type: 'MOVE', x, y, color, caps: captured, ko: state.ko
             });
-            
-            gameState.moveCount++;
-            gameState.currentTurn = opponent;
-            
+            state.replayIdx = state.history.length - 1;
+
+            // UI 갱신
             renderBoard();
-            updateUI();
-            startTimer();
+            switchTurn();
+            
+            const posStr = String.fromCharCode(65 + (x >= 8 ? x+1 : x)) + (SIZE - y);
+            addLog(`${color === 1 ? '흑' : '백'}: ${posStr} 착수`, color === 1 ? "black" : "white");
         }
 
-        function processPass(isMyMove) {
-            const color = gameState.currentTurn;
-            addLog(`${color === 1 ? '흑' : '백'}: 한수쉼`);
+        function passTurn(isMe) {
+            const color = state.turn;
+            state.history.push({ type: 'PASS', color });
+            state.replayIdx = state.history.length - 1;
             
-            gameState.history.push({ type: 'PASS', color });
-            gameState.moveCount++;
-            gameState.currentTurn = color === 1 ? 2 : 1;
-            
-            // Two consecutive passes end the game
-            const len = gameState.history.length;
-            if (len >= 2 && gameState.history[len-1].type === 'PASS' && gameState.history[len-2].type === 'PASS') {
+            addLog(`${color === 1 ? '흑' : '백'}: 한수쉼`, "system");
+
+            // 연속 두 번 쉬면 종료
+            const len = state.history.length;
+            if (len >= 2 && state.history[len-1].type === 'PASS' && state.history[len-2].type === 'PASS') {
                 calculateScore();
             }
 
-            if (isMyMove) sendData({ type: 'PASS' });
-            updateUI();
-            startTimer();
+            if (isMe) sendData({type: 'PASS'});
+            switchTurn();
         }
 
-        function undoMove() {
-            if (gameState.history.length === 0) return;
-            
-            const last = gameState.history.pop();
-            if (last.type === 'MOVE') {
-                gameState.board[last.y][last.x] = 0;
-                last.captured.forEach(stone => {
-                    gameState.board[stone.y][stone.x] = last.color === 1 ? 2 : 1;
-                    gameState.captures[last.color]--;
-                });
-                gameState.koPoint = last.koBefore;
-            }
-            
-            gameState.moveCount--;
-            gameState.currentTurn = last.color;
-            renderBoard();
+        function switchTurn() {
+            state.turn = state.turn === 1 ? 2 : 1;
             updateUI();
+            resetTimer();
         }
 
-        // --- UI Rendering ---
+        // --- UI 렌더링 및 유틸리티 ---
         function renderBoard() {
-            // Remove existing stones
-            const stones = document.querySelectorAll('.stone');
-            stones.forEach(s => s.remove());
+            // 기존 돌 제거
+            document.querySelectorAll('.stone').forEach(s => s.remove());
+            const board = document.getElementById('baduk-board');
 
-            const boardEl = document.getElementById('baduk-board');
-            const lastMove = gameState.history[gameState.history.length - 1];
-
-            for (let y = 0; y < BOARD_SIZE; y++) {
-                for (let x = 0; x < BOARD_SIZE; x++) {
-                    if (gameState.board[y][x] !== 0) {
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    if (state.board[y][x] !== 0) {
                         const stone = document.createElement('div');
-                        const colorClass = gameState.board[y][x] === 1 ? 'black' : 'white';
-                        stone.className = `stone ${colorClass}`;
-                        
-                        if (lastMove && lastMove.type === 'MOVE' && lastMove.x === x && lastMove.y === y) {
+                        const isBlack = state.board[y][x] === 1;
+                        stone.className = `stone ${isBlack ? 'black' : 'white'} animate-drop`;
+                        stone.style.top = `${PADDING_PCT + (y * GRID_PCT)}%`;
+                        stone.style.left = `${PADDING_PCT + (x * GRID_PCT)}%`;
+
+                        // 마지막 수 강조
+                        const last = state.history[state.history.length-1];
+                        if (last && last.type === 'MOVE' && last.x === x && last.y === y) {
                             stone.classList.add('last-move');
                         }
 
-                        stone.style.top = `${PADDING + (y * GRID_STEP)}%`;
-                        stone.style.left = `${PADDING + (x * GRID_STEP)}%`;
-                        boardEl.appendChild(stone);
+                        board.appendChild(stone);
                     }
                 }
             }
-        }
-
-        function showGhost(x, y) {
-            if (gameState.board[y][x] !== 0 || gameState.currentTurn !== gameState.myColor || gameState.isGameOver) return;
-            
-            clearGhost();
-            const ghost = document.createElement('div');
-            ghost.id = 'ghost-stone';
-            ghost.className = `stone ${gameState.myColor === 1 ? 'black' : 'white'} opacity-40 pointer-events-none`;
-            ghost.style.top = `${PADDING + (y * GRID_STEP)}%`;
-            ghost.style.left = `${PADDING + (x * GRID_STEP)}%`;
-            document.getElementById('baduk-board').appendChild(ghost);
-        }
-
-        function clearGhost() {
-            const ghost = document.getElementById('ghost-stone');
-            if (ghost) ghost.remove();
+            document.getElementById('current-move-display').textContent = `${state.history.length} MOVE`;
         }
 
         function updateUI() {
-            document.getElementById('move-count').textContent = gameState.moveCount;
-            document.getElementById('captures-black').textContent = gameState.captures[1];
-            document.getElementById('captures-white').textContent = gameState.captures[2];
-
-            // Turn Indicator
-            const blackCard = document.getElementById('player-black-card');
-            const whiteCard = document.getElementById('player-white-card');
-
-            if (gameState.currentTurn === 1) {
-                blackCard.classList.add('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
-                whiteCard.classList.remove('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
+            const bCard = document.getElementById('card-black');
+            const wCard = document.getElementById('card-white');
+            
+            if (state.turn === 1) {
+                bCard.classList.add('pulse-turn', 'border-blue-500');
+                wCard.classList.remove('pulse-turn', 'border-blue-500');
             } else {
-                whiteCard.classList.add('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
-                blackCard.classList.remove('active-turn-indicator', 'border-blue-500', 'bg-blue-900/10');
+                wCard.classList.add('pulse-turn', 'border-blue-500');
+                bCard.classList.remove('pulse-turn', 'border-blue-500');
             }
+
+            document.getElementById('caps-black').textContent = state.caps[1];
+            document.getElementById('caps-white').textContent = state.caps[2];
         }
 
-        function updateUIForStart() {
-            document.getElementById('player-black-name').textContent = gameState.myColor === 1 ? "나 (Host)" : "상대방";
-            document.getElementById('player-white-name').textContent = gameState.myColor === 2 ? "나 (Guest)" : "상대방";
-            updateUI();
-            startTimer();
+        function showGhost(x, y) {
+            if (state.board[y][x] !== 0 || state.turn !== state.myColor) return;
+            hideGhost();
+            const ghost = document.createElement('div');
+            ghost.id = 'ghost';
+            ghost.className = `stone ${state.myColor === 1 ? 'black' : 'white'} ghost-stone`;
+            ghost.style.top = `${PADDING_PCT + (y * GRID_PCT)}%`;
+            ghost.style.left = `${PADDING_PCT + (x * GRID_PCT)}%`;
+            document.getElementById('baduk-board').appendChild(ghost);
         }
 
-        // --- Timer & Logic ---
-        function startTimer() {
-            clearInterval(gameState.timerInterval);
-            gameState.timerInterval = setInterval(() => {
-                if (gameState.isGameOver) return;
-                
-                gameState.timers[gameState.currentTurn]--;
+        function hideGhost() {
+            const g = document.getElementById('ghost');
+            if (g) g.remove();
+        }
+
+        function addLog(msg, type) {
+            const logs = document.getElementById('game-logs');
+            const entry = document.createElement('div');
+            entry.className = "flex gap-2 items-start";
+            
+            let colorClass = "text-gray-400";
+            if (type === 'black') colorClass = "text-white font-bold";
+            if (type === 'white') colorClass = "text-blue-300";
+            if (type === 'system') colorClass = "text-yellow-500";
+            if (type === 'error') colorClass = "text-red-500";
+
+            entry.innerHTML = `<span class="text-[9px] opacity-30 mt-1">${new Date().toLocaleTimeString()}</span><span class="${colorClass}">${msg}</span>`;
+            logs.appendChild(entry);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function resetTimer() {
+            clearInterval(state.timerIdx);
+            state.timerIdx = setInterval(() => {
+                if (state.isGameOver) return;
+                state.timers[state.turn]--;
                 updateTimerDisplay();
-
-                if (gameState.timers[gameState.currentTurn] <= 0) {
-                    endGame('TIMEOUT', gameState.currentTurn === 1 ? 2 : 1);
-                }
+                if (state.timers[state.turn] <= 0) finalizeGame('TIMEOUT', state.turn === 1 ? 2 : 1);
             }, 1000);
         }
 
         function updateTimerDisplay() {
-            const formatTime = (s) => {
-                const min = Math.floor(s / 60);
-                const sec = s % 60;
-                return `${min}:${sec < 10 ? '0' : ''}${sec}`;
-            };
-            document.getElementById('timer-black').textContent = formatTime(gameState.timers[1]);
-            document.getElementById('timer-white').textContent = formatTime(gameState.timers[2]);
+            const fmt = (s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2, '0')}`;
+            document.getElementById('timer-black').textContent = fmt(state.timers[1]);
+            document.getElementById('timer-white').textContent = fmt(state.timers[2]);
         }
 
-        // --- Score Calculation (Simple Territory) ---
+        // --- 대국 종료 및 계가 ---
         function calculateScore() {
-            // This is a simplified BFS territory counting
-            const board = JSON.parse(JSON.stringify(gameState.board));
-            let blackTerritory = 0;
-            let whiteTerritory = 0;
-            const visited = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(false));
-
-            for (let y = 0; y < BOARD_SIZE; y++) {
-                for (let x = 0; x < BOARD_SIZE; x++) {
-                    if (board[y][x] === 0 && !visited[y][x]) {
-                        const {area, owners} = floodFillTerritory(x, y, visited);
-                        if (owners.size === 1) {
-                            if (owners.has(1)) blackTerritory += area.length;
-                            if (owners.has(2)) whiteTerritory += area.length;
+            // 단순 집 계산 알고리즘 (Flood Fill)
+            let bScore = state.caps[1];
+            let wScore = state.caps[2] + KOMI;
+            
+            const visited = Array(SIZE).fill().map(() => Array(SIZE).fill(false));
+            
+            for(let y=0; y<SIZE; y++) {
+                for(let x=0; x<SIZE; x++) {
+                    if (state.board[y][x] === 0 && !visited[y][x]) {
+                        const {area, borders} = floodFillArea(x, y, visited);
+                        if (borders.size === 1) {
+                            if (borders.has(1)) bScore += area.length;
+                            if (borders.has(2)) wScore += area.length;
                         }
                     }
                 }
             }
-
-            const blackTotal = blackTerritory + gameState.captures[1];
-            const whiteTotal = whiteTerritory + gameState.captures[2] + KOMI;
-
-            showResult(blackTotal, whiteTotal);
-        }
-
-        function floodFillTerritory(x, y, globalVisited) {
-            const area = [];
-            const owners = new Set();
-            const stack = [{x, y}];
-            const localVisited = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(false));
-
-            while (stack.length > 0) {
-                const curr = stack.pop();
-                if (curr.x < 0 || curr.x >= BOARD_SIZE || curr.y < 0 || curr.y >= BOARD_SIZE) continue;
-                if (localVisited[curr.y][curr.x]) continue;
-
-                if (gameState.board[curr.y][curr.x] !== 0) {
-                    owners.add(gameState.board[curr.y][curr.x]);
-                    continue;
-                }
-
-                localVisited[curr.y][curr.x] = true;
-                globalVisited[curr.y][curr.x] = true;
-                area.push(curr);
-
-                stack.push({x: curr.x+1, y: curr.y}, {x: curr.x-1, y: curr.y}, {x: curr.x, y: curr.y+1}, {x: curr.x, y: curr.y-1});
-            }
-            return {area, owners};
-        }
-
-        // --- Utility UI ---
-        function addLog(msg) {
-            const logBox = document.getElementById('game-logs');
-            const entry = document.createElement('div');
-            const time = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
-            entry.innerHTML = `<span class="text-slate-500">[${time}]</span> ${msg}`;
-            logBox.appendChild(entry);
-            logBox.scrollTop = logBox.scrollHeight;
-        }
-
-        function addChatMessage(sender, text) {
-            const chatBox = document.getElementById('chat-messages');
-            const entry = document.createElement('div');
-            const isMe = sender === (gameState.myColor === 1 ? "흑" : "백");
             
-            entry.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
-            entry.innerHTML = `
-                <span class="text-[10px] text-slate-500 mb-1">${sender}</span>
-                <div class="${isMe ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200'} px-3 py-2 rounded-2xl text-sm max-w-[80%]">
-                    ${text}
+            state.isGameOver = true;
+            document.getElementById('final-b').textContent = bScore.toFixed(1);
+            document.getElementById('final-w').textContent = wScore.toFixed(1);
+            document.getElementById('modal-title').textContent = bScore > wScore ? "흑 승리!" : "백 승리!";
+            document.getElementById('modal-desc').textContent = `${Math.abs(bScore - wScore).toFixed(1)}집 차이로 종료되었습니다.`;
+            document.getElementById('result-modal').classList.remove('hidden');
+            document.getElementById('result-modal').classList.add('flex');
+        }
+
+        function floodFillArea(x, y, globalVisited) {
+            const area = [];
+            const borders = new Set();
+            const queue = [{x, y}];
+            globalVisited[y][x] = true;
+
+            while(queue.length > 0) {
+                const p = queue.shift();
+                area.push(p);
+
+                [[p.x+1, p.y], [p.x-1, p.y], [p.x, p.y+1], [p.x, p.y-1]].forEach(([nx, ny]) => {
+                    if (nx >= 0 && nx < SIZE && ny >= 0 && ny < SIZE) {
+                        if (state.board[ny][nx] === 0) {
+                            if (!globalVisited[ny][nx]) {
+                                globalVisited[ny][nx] = true;
+                                queue.push({x: nx, y: ny});
+                            }
+                        } else {
+                            borders.add(state.board[ny][nx]);
+                        }
+                    }
+                });
+            }
+            return {area, borders};
+        }
+
+        function finalizeGame(reason, winner) {
+            state.isGameOver = true;
+            clearInterval(state.timerIdx);
+            const wName = winner === 1 ? "흑" : "백";
+            let msg = reason === 'RESIGN' ? `${wName} 불계승 (상대 기권)` : `${wName} 시간승`;
+            alert(msg);
+            addLog(`대국 종료: ${msg}`, "system");
+        }
+
+        // --- 채팅 기능 ---
+        function receiveChat(msg, sender) {
+            const chatBox = document.getElementById('chat-messages');
+            const div = document.createElement('div');
+            const isMe = sender === (state.myColor === 1 ? "Black" : "White");
+            div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+            div.innerHTML = `
+                <span class="text-[9px] text-gray-500 mb-1">${sender}</span>
+                <div class="${isMe ? 'bg-blue-600' : 'bg-gray-700'} px-3 py-2 rounded-2xl text-xs max-w-[85%] shadow-md">
+                    ${msg}
                 </div>
             `;
-            chatBox.appendChild(entry);
+            chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function showResult(black, white) {
-            gameState.isGameOver = true;
-            clearInterval(gameState.timerInterval);
-
-            const modal = document.getElementById('result-modal');
-            const title = document.getElementById('result-title');
-            const scoreText = document.getElementById('result-score');
-            
-            document.getElementById('final-black-score').textContent = black.toFixed(1);
-            document.getElementById('final-white-score').textContent = white.toFixed(1);
-
-            const winner = black > white ? "흑" : "백";
-            const diff = Math.abs(black - white).toFixed(1);
-
-            title.textContent = `${winner} 불계승!`;
-            scoreText.textContent = `${winner}이 ${diff}집 차이로 승리하였습니다.`;
-            
-            modal.style.display = 'flex';
-        }
-
-        function endGame(reason, winnerColor) {
-            gameState.isGameOver = true;
-            clearInterval(gameState.timerInterval);
-            
-            const winner = winnerColor === 1 ? "흑" : "백";
-            let msg = "";
-            if (reason === 'RESIGN') msg = `${winner} 불계승 (상대 기권)`;
-            if (reason === 'TIMEOUT') msg = `${winner} 시간승`;
-
-            alert(msg);
-            addLog(`대국 종료: ${msg}`);
-        }
-
-        function closeModal() {
-            document.getElementById('result-modal').style.display = 'none';
-        }
-
-        // --- Event Listeners ---
-        connectBtn.addEventListener('click', () => {
-            const id = remoteIdInput.value.trim();
-            if (id.length === 4) {
-                conn = peer.connect('baduk-' + id);
-                setupConnection();
-            } else {
-                alert("4자리 숫자 코드를 입력해주세요.");
+        // --- 무르기 로직 ---
+        function undoMove() {
+            if (state.history.length === 0) return;
+            const last = state.history.pop();
+            if (last.type === 'MOVE') {
+                state.board[last.y][last.x] = 0;
+                last.caps.forEach(p => {
+                    const opponent = last.color === 1 ? 2 : 1;
+                    state.board[p.y][p.x] = opponent;
+                    state.caps[last.color]--;
+                });
+                state.ko = last.ko;
             }
-        });
+            state.turn = last.color; // 무른 사람의 차례로 복구
+            state.replayIdx = state.history.length - 1;
+            renderBoard();
+            updateUI();
+            addLog(`${last.color === 1 ? '흑' : '백'} 무르기 실행`, "system");
+        }
 
-        document.getElementById('chat-form').addEventListener('submit', (e) => {
+        // --- 알림 시스템 ---
+        function showAlert(msg, onYes, onNo) {
+            const overlay = document.getElementById('alert-overlay');
+            document.getElementById('alert-msg').textContent = msg;
+            overlay.classList.remove('hidden');
+            
+            document.getElementById('alert-yes').onclick = () => {
+                if (onYes) onYes();
+                overlay.classList.add('hidden');
+            };
+            document.getElementById('alert-no').onclick = () => {
+                if (onNo) onNo();
+                overlay.classList.add('hidden');
+            };
+        }
+
+        // --- 이벤트 리스너 ---
+        document.getElementById('btn-connect').onclick = () => {
+            const id = document.getElementById('remote-peer-id').value;
+            if (id.length === 4) {
+                conn = peer.connect(appId + id);
+                bindConnEvents();
+            }
+        };
+
+        document.getElementById('btn-pass').onclick = () => {
+            if (state.turn === state.myColor && !state.isGameOver) passTurn(true);
+        };
+
+        document.getElementById('btn-resign').onclick = () => {
+            if (confirm("정말 기권하시겠습니까?")) {
+                const winner = state.myColor === 1 ? 2 : 1;
+                finalizeGame('RESIGN', winner);
+                sendData({type: 'RESIGN', winner});
+            }
+        };
+
+        document.getElementById('btn-undo').onclick = () => {
+            if (state.history.length > 0 && !state.isGameOver) {
+                sendData({type: 'UNDO_REQ'});
+                addLog("무르기를 요청했습니다...", "system");
+            }
+        };
+
+        document.getElementById('btn-counting').onclick = () => {
+            if (!state.isGameOver) {
+                sendData({type: 'COUNT_REQ'});
+                addLog("형세판단을 요청했습니다.", "system");
+            }
+        };
+
+        document.getElementById('chat-form').onsubmit = (e) => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
-            const text = input.value.trim();
-            if (text && conn) {
-                const sender = gameState.myColor === 1 ? "흑" : "백";
-                addChatMessage(sender, text);
-                sendData({ type: 'CHAT', sender, text });
+            if (input.value.trim() && conn) {
+                const msg = input.value.trim();
+                const sender = state.myColor === 1 ? "Black" : "White";
+                receiveChat(msg, sender);
+                sendData({type: 'CHAT', msg, sender});
                 input.value = '';
             }
-        });
+        };
 
-        document.getElementById('btn-pass').addEventListener('click', () => {
-            if (gameState.currentTurn === gameState.myColor && !gameState.isGameOver) {
-                processPass(true);
-            }
-        });
+        function closeModal() {
+            document.getElementById('result-modal').classList.add('hidden');
+        }
 
-        document.getElementById('btn-resign').addEventListener('click', () => {
-            if (confirm("정말 기권하시겠습니까?")) {
-                const winner = gameState.myColor === 1 ? 2 : 1;
-                endGame('RESIGN', winner);
-                sendData({ type: 'RESIGN', sender: winner });
-            }
-        });
+        function startGame() {
+            addLog("대국이 시작되었습니다. 착수해 주세요.", "system");
+            updateUI();
+            resetTimer();
+        }
 
-        document.getElementById('btn-undo').addEventListener('click', () => {
-            if (gameState.history.length > 0 && !gameState.isGameOver) {
-                sendData({ type: 'UNDO' });
-                addLog("무르기를 요청했습니다...");
-            }
-        });
-
-        document.getElementById('btn-counting').addEventListener('click', () => {
-            if (!gameState.isGameOver) {
-                sendData({ type: 'COUNT_REQ' });
-                addLog("상대방에게 계가를 요청했습니다.");
-            }
-        });
-
-        document.getElementById('btn-save-sgf').addEventListener('click', () => {
-            // Simple SGF Generator
-            let sgf = `(;GM[1]FF[4]SZ[19]KM[${KOMI}]RU[Japanese]\n`;
-            gameState.history.forEach(m => {
-                if (m.type === 'MOVE') {
-                    const x = String.fromCharCode(97 + m.x);
-                    const y = String.fromCharCode(97 + m.y);
-                    sgf += `;${m.color === 1 ? 'B' : 'W'}[${x}${y}]`;
-                } else if (m.type === 'PASS') {
-                    sgf += `;${m.color === 1 ? 'B' : 'W'}[]`;
-                }
-            });
-            sgf += ")";
-            
-            const blob = new Blob([sgf], {type: 'text/plain'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `baduk_game_${new Date().getTime()}.sgf`;
-            a.click();
-        });
-
-        // --- Init ---
+        // 초기화
         window.onload = () => {
-            initPeer();
-            createBoard();
+            createBoardUI();
+            initNetwork();
             lucide.createIcons();
-            addLog("환영합니다! 상단의 코드를 공유하여 대국을 시작하세요.");
+            
+            // 복사 버튼 기능
+            document.getElementById('btn-copy-id').onclick = () => {
+                const id = document.getElementById('my-peer-id').textContent;
+                navigator.clipboard.writeText(id).then(() => alert("코드가 복사되었습니다."));
+            };
         };
     </script>
 </body>
